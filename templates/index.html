@@ -42,13 +42,16 @@
     }
     .head-titles h1 { font-size: 19px; margin: 0; font-weight: 800; letter-spacing: .3px; color: #fff; }
     .head-titles p { margin: 2px 0 0; font-size: 12px; color: rgba(255, 255, 255, .85); }
-    .head-actions { margin-left: auto; display: flex; gap: 10px; position: relative; z-index: 2; }
-    .head-watermark {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
-      color: rgba(255, 255, 255, .30); white-space: nowrap;
-      pointer-events: none; user-select: none; z-index: 1;
+    .head-actions { margin-left: auto; display: flex; gap: 10px; }
+    /* 整頁置中浮水印 */
+    .page-watermark {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-size: 84px; font-weight: 800; letter-spacing: 6px; white-space: nowrap;
+      color: rgba(124, 58, 237, .10);            /* 亮色：淡紫 */
+      pointer-events: none; user-select: none; z-index: 9999;
     }
+    body.dark-map .page-watermark { color: rgba(255, 255, 255, .12); }  /* 深色地圖：淡白 */
     .ghost-btn {
       display: inline-flex; align-items: center; gap: 6px;
       background: rgba(255, 255, 255, .16); color: #fff; border: 1px solid rgba(255, 255, 255, .35);
@@ -171,11 +174,12 @@
       <h1 data-i18n="app_title">電信訊號品質查詢系統</h1>
       <p data-i18n="app_subtitle">輸入地址/地標/座標，查詢該位置方圓(m) 4G/5G訊號覆蓋狀況</p>
     </div>
-    <div class="head-watermark">Amdocs - Pin Wang</div>
     <div class="head-actions">
       <button id="lang-toggle" class="ghost-btn">🌐 EN</button>
     </div>
   </header>
+
+  <div class="page-watermark">Amdocs - Pin Wang</div>
 
   <div class="layout">
     <aside class="sidebar">
@@ -414,6 +418,7 @@
     function setMapTheme(dark) {
       if (dark === mapDark) return;
       mapDark = dark;
+      document.body.classList.toggle('dark-map', mapDark);
       if (mapDark) { map.removeLayer(lightTiles); darkTiles.addTo(map); darkTiles.bringToBack(); }
       else { map.removeLayer(darkTiles); lightTiles.addTo(map); lightTiles.bringToBack(); }
     }
