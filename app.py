@@ -723,9 +723,15 @@ def ensure_data():
     zip_path = os.path.join(extract_to, "_data_download.zip")
     print(f"[啟動] 下載資料中：{data_url}")
     if "drive.google" in data_url or "googleusercontent" in data_url:
-        # Google Drive 大檔需處理「無法掃毒」確認頁，交給 gdown 處理
+        # Google Drive 大檔需處理「無法掃毒」確認頁，交給 gdown 處理。
+        # 自連結解析檔案 ID，改用最相容的 uc?id= 形式 (不依賴 fuzzy 參數)。
         import gdown
-        gdown.download(url=data_url, output=zip_path, quiet=False, fuzzy=True)
+        m = (re.search(r"/d/([A-Za-z0-9_-]+)", data_url)
+             or re.search(r"[?&]id=([A-Za-z0-9_-]+)", data_url))
+        if not m:
+            raise ValueError(f"無法從連結解析 Google Drive 檔案 ID：{data_url}")
+        gdown.download(f"https://drive.google.com/uc?id={m.group(1)}",
+                       zip_path, quiet=False)
     else:
         resp = requests.get(data_url, timeout=600)
         resp.raise_for_status()
