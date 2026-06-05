@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 執行期 / 快取 (可由資料重新產生)
+server.log
+county_bbox*.json
+
+# 機密設定 (請勿提交)
+.env
+tgos_config.json
+
+# 備份壓縮檔
+*.zip
+
+# 訊號原始/合併資料 (太大，改放雲端，部署時下載)
+*.csv
+TWM_*/
+data/

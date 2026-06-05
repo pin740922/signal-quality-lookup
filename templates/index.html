@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>訊號品質查詢系統</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --border: #e2e8f0;
+      --border-bright: rgba(37, 99, 235, .45);
+      --text: #1e293b;
+      --muted: #64748b;
+      --brand: #0066cc;
+      --brand2: #3b82f6;
+      --brand-dark: #00478f;
+      --grad: linear-gradient(135deg, #0078d4, #3b82f6);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Microsoft JhengHei", system-ui, sans-serif;
+      color: var(--text); overflow: hidden; background: var(--bg);
+    }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+    /* ---------- Header ---------- */
+    header {
+      display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+      background: linear-gradient(90deg, var(--brand-dark), var(--brand)); color: #fff;
+      position: relative; z-index: 1200; box-shadow: 0 2px 12px rgba(0, 0, 0, .15);
+    }
+    header .logo {
+      width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 22px;
+      background: rgba(255, 255, 255, .18); box-shadow: inset 0 0 12px rgba(255, 255, 255, .25);
+    }
+    .head-titles h1 { font-size: 19px; margin: 0; font-weight: 800; letter-spacing: .3px; color: #fff; }
+    .head-titles p { margin: 2px 0 0; font-size: 12px; color: rgba(255, 255, 255, .85); }
+    .head-actions { margin-left: auto; display: flex; gap: 10px; }
+    .ghost-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255, 255, 255, .16); color: #fff; border: 1px solid rgba(255, 255, 255, .35);
+      border-radius: 10px; padding: 9px 13px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: .18s; white-space: nowrap;
+    }
+    .ghost-btn:hover { background: rgba(255, 255, 255, .28); transform: translateY(-1px); }
+
+    /* ---------- Layout ---------- */
+    .layout { display: flex; height: calc(100vh - 71px); }
+    .sidebar {
+      width: 386px; min-width: 386px; display: flex; flex-direction: column;
+      background: var(--panel); border-right: 1px solid var(--border);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .sidebar::-webkit-scrollbar { width: 9px; }
+    .sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+    .tabs { display: flex; border-bottom: 1px solid var(--border); }
+    .tab {
+      flex: 1; padding: 14px; text-align: center; cursor: pointer; font-weight: 600; font-size: 14px;
+      color: var(--muted); border-bottom: 3px solid transparent; transition: .15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--brand); border-bottom-color: var(--brand); background: #f8fbff; }
+
+    .form { padding: 18px; }
+    .form.hidden { display: none; }
+    label { display: block; font-size: 12px; font-weight: 600; margin: 13px 0 6px; color: var(--muted); letter-spacing: .3px; }
+    input, select {
+      width: 100%; padding: 10px 12px; font-size: 14px; color: var(--text);
+      border: 1px solid var(--border); border-radius: 9px; outline: none; background: #fff; transition: .15s;
+    }
+    input::placeholder { color: #94a3b8; }
+    input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(0, 102, 204, .14); }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button.search {
+      width: 100%; margin-top: 18px; padding: 12px; font-size: 15px; font-weight: 700; color: #fff;
+      background: var(--grad); border: none; border-radius: 10px; cursor: pointer; transition: .18s;
+      box-shadow: 0 6px 18px rgba(0, 102, 204, .22); letter-spacing: .5px;
+    }
+    button.search:hover { box-shadow: 0 8px 22px rgba(0, 102, 204, .32); transform: translateY(-1px); filter: brightness(1.03); }
+    button.search:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
+    .radius-row { display: flex; gap: 10px; align-items: stretch; }
+    .radius-row input { width: 96px; flex: 0 0 96px; }
+    .radius-row button.search { margin-top: 0; flex: 1; width: auto; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.55; }
+
+    /* ---------- Result ---------- */
+    .result { padding: 0 14px 16px; }
+    .alert { margin: 10px 14px; padding: 10px 12px; border-radius: 9px; font-size: 14px; }
+    .alert.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .verdict-card {
+      border-radius: 14px; padding: 14px 15px; color: #fff; margin-bottom: 11px; position: relative; overflow: hidden;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+    }
+    .verdict-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 45%); pointer-events: none; }
+    .net-badge {
+      display: inline-block; background: rgba(0, 0, 0, .22); border: 1px solid rgba(255, 255, 255, .3);
+      border-radius: 7px; padding: 2px 10px; font-size: 11px; font-weight: 800; letter-spacing: 1px; margin-bottom: 9px;
+    }
+    .verdict-card .big { font-size: 30px; font-weight: 800; line-height: 1.05; }
+    .verdict-card .sub { font-size: 13px; opacity: .95; margin-top: 6px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 11px; }
+    .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 11px; padding: 10px 11px; transition: .15s; }
+    .stat:hover { border-color: var(--border-bright); }
+    .stat .v { font-size: 20px; font-weight: 700; color: #0f3a66; font-family: "JetBrains Mono", monospace; }
+    .stat .v span { font-size: 12px; color: var(--muted); font-family: "Inter", sans-serif; }
+    .stat .l { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+    .addr-line { font-size: 12px; color: var(--muted); margin-top: 8px; word-break: break-all; line-height: 1.6; }
+    .addr-line .mono { color: #0066cc; }
+
+    /* ---------- Map ---------- */
+    .map-wrap { flex: 1; position: relative; display: flex; flex-direction: column; }
+    #map { flex: 1; width: 100%; background: #e8eef5; }
+    .map-funcbar {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 16px;
+      background: #fff; border-bottom: 1px solid var(--border); box-shadow: 0 1px 6px rgba(0, 0, 0, .06);
+      z-index: 850; font-size: 13px; font-weight: 600;
+    }
+    .fb-group { display: flex; align-items: center; gap: 8px; }
+    .fb-group > span { color: var(--muted); }
+    .map-funcbar select { width: auto; padding: 7px 10px; font-weight: 600; }
+    #net { min-width: 80px; border-color: var(--brand); color: var(--brand); font-weight: 800; background: #f0f7ff; }
+    .fb-btn {
+      background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px;
+      font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: .15s;
+    }
+    .fb-btn:hover { background: #f1f5f9; border-color: var(--border-bright); }
+    .fb-btn.done { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .fb-sep { width: 1px; align-self: stretch; background: var(--border); }
+
+    .legend {
+      position: absolute; bottom: 18px; right: 18px; z-index: 800; background: #fff;
+      border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 2px 12px rgba(0, 0, 0, .15);
+      padding: 11px 13px; font-size: 12px;
+    }
+    .legend .legend-title { font-weight: 700; margin-bottom: 6px; color: var(--text); }
+    .legend .item { display: flex; align-items: center; gap: 7px; margin: 4px 0; color: var(--muted); }
+    .legend .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+    .spinner {
+      display: none; position: absolute; inset: 0; background: rgba(255, 255, 255, .6);
+      z-index: 900; place-items: center; font-weight: 600; color: var(--brand);
+    }
+    .spinner.show { display: grid; }
+    .loader {
+      width: 38px; height: 38px; border: 3px solid #cbd5e1; border-top-color: var(--brand);
+      border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">📶</div>
+    <div class="head-titles">
+      <h1 data-i18n="app_title">電信訊號品質查詢系統</h1>
+      <p data-i18n="app_subtitle">輸入地址/地標/座標，查詢該位置方圓(m) 4G/5G訊號覆蓋狀況</p>
+    </div>
+    <div class="head-actions">
+      <button id="lang-toggle" class="ghost-btn">🌐 EN</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="tabs">
+        <div class="tab active" data-tab="address" data-i18n="tab_address">地址查詢</div>
+        <div class="tab" data-tab="landmark" data-i18n="tab_landmark">地標查詢</div>
+      </div>
+
+      <!-- 地址查詢 -->
+      <div class="form" id="form-address">
+        <label data-i18n="label_city">縣 / 市</label>
+        <select id="city"></select>
+        <label data-i18n="label_district">行政區</label>
+        <select id="district"><option value="" data-i18n="dist_select_first">請先選擇縣 / 市</option></select>
+        <div class="row">
+          <div>
+            <label data-i18n="label_road">路 / 街名</label>
+            <input id="road" data-i18n-ph="ph_road" placeholder="例：市府路" />
+          </div>
+          <div>
+            <label data-i18n="label_number">門牌號碼</label>
+            <input id="number" data-i18n-ph="ph_number" placeholder="例：45號" />
+          </div>
+        </div>
+        <label data-i18n="label_radius">查詢半徑 (公尺)</label>
+        <div class="radius-row">
+          <input id="radius-a" type="number" value="500" min="100" max="2000" step="100" />
+          <button class="search" id="btn-address" data-i18n="btn_search">查詢訊號品質</button>
+        </div>
+        <p class="hint" data-i18n="hint_address">系統會將地址轉換為經緯度，顯示該位置方圓範圍內的訊號格點。</p>
+      </div>
+
+      <!-- 地標查詢 -->
+      <div class="form hidden" id="form-landmark">
+        <label data-i18n="label_landmark">地標名稱</label>
+        <input id="keyword" data-i18n-ph="ph_landmark" placeholder="例：台北101、台中市政府、高雄車站" />
+        <label data-i18n="label_latlng">經緯度（可直接從 Google 地圖複製貼上）</label>
+        <input id="latlng" placeholder="例：25.033964, 121.564468" />
+        <label data-i18n="label_radius">查詢半徑 (公尺)</label>
+        <div class="radius-row">
+          <input id="radius-l" type="number" value="500" min="100" max="2000" step="100" />
+          <button class="search" id="btn-landmark" data-i18n="btn_search">查詢訊號品質</button>
+        </div>
+        <p class="hint" data-i18n-html="hint_landmark">可輸入地標名稱，或在 Google 地圖對地點按右鍵複製「經緯度」貼到上方欄位。<br>兩者皆填時，以經緯度為準。</p>
+      </div>
+
+      <div id="alert-box"></div>
+      <div class="result" id="result"></div>
+    </aside>
+
+    <div class="map-wrap">
+      <div class="map-funcbar">
+        <div class="fb-group">
+          <span data-i18n="fb_net">網路別</span>
+          <select id="net">
+            <option value="4G" selected>4G</option>
+            <option value="5G">5G</option>
+          </select>
+        </div>
+        <div class="fb-sep"></div>
+        <button class="fb-btn" id="copy-center" data-i18n="fb_copy">📋 複製中心經緯度</button>
+        <div class="fb-sep"></div>
+        <div class="fb-group">
+          <span data-i18n="fb_opacity">訊號點透明度</span>
+          <select id="opacity">
+            <option value="1.0">100%</option>
+            <option value="0.85" selected>85%</option>
+            <option value="0.6">60%</option>
+            <option value="0.4">40%</option>
+            <option value="0.2">20%</option>
+            <option value="0.1">10%</option>
+          </select>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="spinner" id="spinner"><div><div class="loader"></div><span data-i18n="searching">查詢中…</span></div></div>
+      <div class="legend">
+        <div class="legend-title" data-i18n="legend_title">RSRP 訊號強度</div>
+        <div class="item"><span class="dot" style="background:#2a52e8"></span><span data-i18n="q_excellent">優良 (≥ -85 dBm)</span></div>
+        <div class="item"><span class="dot" style="background:#1fa01f"></span><span data-i18n="q_good">良好 (-95 ~ -85)</span></div>
+        <div class="item"><span class="dot" style="background:#d4d43b"></span><span data-i18n="q_fair">普通 (-105 ~ -95)</span></div>
+        <div class="item"><span class="dot" style="background:#f6b26b"></span><span data-i18n="q_weak">較弱 (-115 ~ -105)</span></div>
+        <div class="item"><span class="dot" style="background:#e60000"></span><span data-i18n="q_vweak">微弱 (< -115)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  {% if google_key %}<script src="https://maps.googleapis.com/maps/api/js?key={{ google_key }}&language=zh-TW&region=TW" async defer></script>{% endif %}
+  <script>
+    // ---------------------------------------------------------------------
+    // 多國語系 (i18n)
+    // ---------------------------------------------------------------------
+    let LANG = 'zh';  // 'zh' | 'en'
+    const I18N = {
+      app_title: ['電信訊號品質查詢系統', 'Telecom Signal Quality Lookup'],
+      app_subtitle: ['輸入地址/地標/座標，查詢該位置方圓(m) 4G/5G訊號覆蓋狀況', 'Search by address / landmark / coordinates for 4G/5G signal coverage within a radius (m)'],
+      tab_address: ['地址查詢', 'Address'],
+      tab_landmark: ['地標查詢', 'Landmark'],
+      label_city: ['縣 / 市', 'City / County'],
+      label_district: ['行政區', 'District'],
+      dist_select_first: ['請先選擇縣 / 市', 'Select a city first'],
+      dist_all: ['不限 / 全區', 'All districts'],
+      loading: ['載入中…', 'Loading…'],
+      label_road: ['路 / 街名', 'Road / Street'],
+      ph_road: ['例：市府路', 'e.g., Shifu Rd.'],
+      label_number: ['門牌號碼', 'House No.'],
+      ph_number: ['例：45號', 'e.g., No. 45'],
+      label_radius: ['查詢半徑 (公尺)', 'Radius (m)'],
+      btn_search: ['查詢訊號品質', 'Search'],
+      hint_address: ['系統會將地址轉換為經緯度，顯示該位置方圓範圍內的訊號格點。', 'The address is converted to coordinates to show signal grid points within the radius.'],
+      label_landmark: ['地標名稱', 'Landmark name'],
+      ph_landmark: ['例：台北101、台中市政府、高雄車站', 'e.g., Taipei 101, Taichung City Hall'],
+      label_latlng: ['經緯度（可直接從 Google 地圖複製貼上）', 'Coordinates (paste from Google Maps)'],
+      hint_landmark: ['可輸入地標名稱，或在 Google 地圖對地點按右鍵複製「經緯度」貼到上方欄位。<br>兩者皆填時，以經緯度為準。', 'Enter a landmark name, or right-click a place in Google Maps to copy its coordinates and paste them above.<br>If both are filled, coordinates take priority.'],
+      fb_net: ['網路別', 'Network'],
+      fb_copy: ['📋 複製中心經緯度', '📋 Copy center coordinates'],
+      fb_copied: ['✓ 已複製：', '✓ Copied: '],
+      fb_opacity: ['訊號點透明度', 'Point opacity'],
+      legend_title: ['RSRP 訊號強度', 'RSRP signal strength'],
+      q_excellent: ['優良 (≥ -85 dBm)', 'Excellent (≥ -85 dBm)'],
+      q_good: ['良好 (-95 ~ -85)', 'Good (-95 ~ -85)'],
+      q_fair: ['普通 (-105 ~ -95)', 'Fair (-105 ~ -95)'],
+      q_weak: ['較弱 (-115 ~ -105)', 'Weak (-115 ~ -105)'],
+      q_vweak: ['微弱 (< -115)', 'Very weak (< -115)'],
+      searching: ['查詢中…', 'Searching…'],
+      map_light: ['☀️ 亮色地圖', '☀️ Light map'],
+      map_dark: ['🌙 深色地圖', '🌙 Dark map'],
+      signal: ['訊號', 'signal'],
+      stat_rsrp: ['平均 RSRP 訊號強度', 'Avg RSRP (strength)'],
+      stat_sinr: ['平均 SINR 訊號品質', 'Avg SINR (quality)'],
+      stat_dl: ['平均下行速率', 'Avg downlink'],
+      stat_poor: ['弱訊號格點比例', 'Weak-signal ratio'],
+      stat_count: ['範圍內格點數', 'Grid points in range'],
+      stat_mr: ['量測樣本數', 'Measurement samples'],
+      approx: ['⚠️ 此為概略位置定位結果(找不到精確門牌)，請以實際地點為準。', '⚠️ Approximate location (exact house number not found). Please verify on site.'],
+      src_label: ['定位來源', 'Source'],
+      coord_label: ['經緯度', 'Coordinates'],
+      popup_pos: ['查詢位置', 'Query location'],
+      popup_signal: ['訊號', 'Signal'],
+      popup_dl: ['下行', 'Downlink'],
+      popup_dist: ['距中心', 'Distance'],
+      custom_coord: ['指定座標', 'Custom coordinate'],
+      err_addr: ['請至少輸入縣市與路名。', 'Please enter at least a city and road.'],
+      err_landmark: ['請輸入地標關鍵字。', 'Please enter a landmark keyword.'],
+      err_coord_none: ['查無此座標位置。', 'No data found for this coordinate.'],
+      err_notfound: ['查無此位置，請確認輸入是否正確。', 'Location not found. Please verify your input.'],
+      err_conn: ['連線發生問題：', 'Connection error: '],
+      err_coord_fmt: ['經緯度格式不正確，請貼上如「25.033964, 121.564468」的座標。', 'Invalid coordinate format. Paste like "25.033964, 121.564468".'],
+    };
+    const QMAP = {
+      '優良': 'Excellent', '良好': 'Good', '普通': 'Fair', '較弱': 'Weak', '微弱': 'Very weak',
+      '無資料': 'No data', '查無資料': 'No data', '資料不足': 'Insufficient data'
+    };
+    const SRCMAP = {
+      'Google': ['Google 地圖', 'Google Maps'],
+      'TGOS': ['TGOS 政府門牌', 'TGOS (gov.)'],
+      'OpenStreetMap': ['OpenStreetMap', 'OpenStreetMap'],
+      'Coordinate': ['指定經緯度', 'Custom coordinates']
+    };
+    const idx = () => (LANG === 'en' ? 1 : 0);
+    function t(k) { const v = I18N[k]; return v ? v[idx()] : k; }
+    function qlabel(zh) { return LANG === 'en' ? (QMAP[zh] || zh) : zh; }
+    function srclabel(src) { const v = SRCMAP[src]; return v ? v[idx()] : (src || 'OpenStreetMap'); }
+
+    function detailText(s) {
+      if (!s.count) return LANG === 'en'
+        ? 'No signal measurements found within this radius. Try a larger radius or verify the address.'
+        : '此位置方圓範圍內查無訊號量測資料，建議擴大查詢範圍或確認地址。';
+      if (s.avg_rsrp === undefined || s.avg_rsrp === null) return LANG === 'en'
+        ? 'Grid points in range lack valid RSRP values; unable to assess.'
+        : '範圍內格點缺少有效訊號強度 (RSRP) 量測值，無法判讀。';
+      const r = Math.round(s.poor_ratio);
+      if (s.poor_ratio >= 40) return LANG === 'en'
+        ? `About ${r}% of grid points have weak signal; possible coverage gaps or poor indoor reception.`
+        : `區域內約 ${r}% 格點訊號偏弱，可能有覆蓋不足或室內收訊不佳情形。`;
+      if (s.poor_ratio >= 15) return LANG === 'en'
+        ? `Overall acceptable, but about ${r}% of points are weak; some spots or indoors may have poorer reception.`
+        : `整體訊號尚可，但約 ${r}% 格點較弱，部分位置或室內可能收訊較差。`;
+      return LANG === 'en'
+        ? 'Signal coverage is good; most locations work normally.'
+        : '整體訊號覆蓋良好，多數位置可正常使用。';
+    }
+
+    function applyLang() {
+      document.documentElement.lang = (LANG === 'en') ? 'en' : 'zh-Hant';
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+      if (copyBtn && !copyBtn.classList.contains('done')) copyBtn.textContent = t('fb_copy');
+      langBtn.textContent = (LANG === 'en') ? '🌐 中文' : '🌐 EN';
+      setMapTheme(LANG === 'en');
+      renderCityOptions();
+      renderDistrictOptions();
+      updateDistrictPlaceholder();
+      if (lastData) render(lastData);
+    }
+
+    // ---------------------------------------------------------------------
+    // 地圖（預設 OpenStreetMap 亮色；可切換 CARTO 深色）
+    // ---------------------------------------------------------------------
+    const INIT_CENTER = [23.7, 121];
+    const INIT_ZOOM = 7;
+    const TW_BOUNDS = L.latLngBounds([20.5, 117.5], [26.9, 122.6]);
+    const map = L.map('map', {
+      zoomControl: true, minZoom: INIT_ZOOM,
+      maxBounds: TW_BOUNDS, maxBoundsViscosity: 1.0
+    }).setView(INIT_CENTER, INIT_ZOOM);
+
+    const lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    });
+    const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
+    });
+    let mapDark = false;
+    lightTiles.addTo(map);
+
+    let layerGroup = L.layerGroup().addTo(map);
+    let pointMarkers = [];
+    let lastSearch = null;
+    let lastData = null;
+
+    const copyBtn = document.getElementById('copy-center');
+    const langBtn = document.getElementById('lang-toggle');
+
+    function currentOpacity() { return parseFloat(document.getElementById('opacity').value); }
+    function currentNet() { return document.getElementById('net').value; }
+    function fmt(v) { return (v === null || v === undefined) ? '—' : v; }
+    function showSpinner(on) { document.getElementById('spinner').classList.toggle('show', on); }
+    function showAlert(msg) {
+      document.getElementById('alert-box').innerHTML = msg ? `<div class="alert error">${msg}</div>` : '';
+    }
+
+    // 地圖深淺色跟著語言走：中文=亮色、English=深色
+    function setMapTheme(dark) {
+      if (dark === mapDark) return;
+      mapDark = dark;
+      if (mapDark) { map.removeLayer(lightTiles); darkTiles.addTo(map); darkTiles.bringToBack(); }
+      else { map.removeLayer(darkTiles); lightTiles.addTo(map); lightTiles.bringToBack(); }
+    }
+
+    langBtn.addEventListener('click', () => { LANG = (LANG === 'en') ? 'zh' : 'en'; applyLang(); });
+
+    document.getElementById('opacity').addEventListener('change', () => {
+      const op = currentOpacity();
+      pointMarkers.forEach(m => m.setStyle({ fillOpacity: op, opacity: Math.min(1, op + 0.15) }));
+    });
+
+    document.getElementById('net').addEventListener('change', () => { if (lastSearch) doSearch(lastSearch); });
+
+    copyBtn.addEventListener('click', async () => {
+      const c = map.getCenter();
+      const text = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+      try { await navigator.clipboard.writeText(text); }
+      catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        try { document.execCommand('copy'); } catch (_) {}
+        document.body.removeChild(ta);
+      }
+      copyBtn.classList.add('done');
+      copyBtn.textContent = `${t('fb_copied')}${text}`;
+      clearTimeout(copyBtn._t);
+      copyBtn._t = setTimeout(() => { copyBtn.classList.remove('done'); copyBtn.textContent = t('fb_copy'); }, 1800);
+    });
+
+    // ---------------------------------------------------------------------
+    // 縣市 / 行政區
+    // ---------------------------------------------------------------------
+    const citySel = document.getElementById('city');
+    const distSel = document.getElementById('district');
+    let countyEn = {};
+
+    function renderCityOptions() {
+      Array.from(citySel.options).forEach(o => {
+        if (o.value) o.textContent = (LANG === 'en') ? (countyEn[o.value] || o.value) : o.value;
+      });
+    }
+    function updateDistrictPlaceholder() {
+      const ph = distSel.querySelector('option[value=""]');
+      if (ph) ph.textContent = (distSel.options.length > 1) ? t('dist_all') : t('dist_select_first');
+    }
+    function renderDistrictOptions() {
+      Array.from(distSel.options).forEach(o => {
+        if (o.value) o.textContent = (LANG === 'en') ? (o.dataset.en || o.value) : o.value;
+      });
+    }
+    function loadDistricts(city) {
+      distSel.innerHTML = `<option value="">${t('loading')}</option>`;
+      fetch('/api/districts?city=' + encodeURIComponent(city))
+        .then(r => r.json())
+        .then(list => {
+          distSel.innerHTML = `<option value="">${t('dist_all')}</option>`;
+          list.forEach(d => {
+            const o = document.createElement('option');
+            o.value = d.zh; o.dataset.en = d.en;
+            o.textContent = (LANG === 'en') ? d.en : d.zh;
+            distSel.appendChild(o);
+          });
+          updateDistrictPlaceholder();
+        });
+    }
+    fetch('/api/counties').then(r => r.json()).then(list => {
+      list.forEach(c => {
+        countyEn[c.zh] = c.en;
+        const o = document.createElement('option');
+        o.value = c.zh; o.textContent = c.zh;
+        citySel.appendChild(o);
+      });
+      if (list.length) { renderCityOptions(); loadDistricts(citySel.value); }
+    });
+    citySel.addEventListener('change', () => loadDistricts(citySel.value));
+
+    // ---------------------------------------------------------------------
+    // 分頁切換
+    // ---------------------------------------------------------------------
+    function resetView() {
+      showAlert('');
+      document.getElementById('result').innerHTML = '';
+      layerGroup.clearLayers();
+      pointMarkers = [];
+      lastData = null;
+      map.setView(INIT_CENTER, INIT_ZOOM);
+    }
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        if (tab.classList.contains('active')) return;
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        tab.classList.add('active');
+        const tt = tab.dataset.tab;
+        document.getElementById('form-address').classList.toggle('hidden', tt !== 'address');
+        document.getElementById('form-landmark').classList.toggle('hidden', tt !== 'landmark');
+        resetView();
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // 定位 + 查詢
+    // ---------------------------------------------------------------------
+    function geocodeGoogle(query) {
+      return new Promise(resolve => {
+        if (!(window.google && google.maps && google.maps.Geocoder)) { resolve(null); return; }
+        try {
+          new google.maps.Geocoder().geocode(
+            { address: query, region: 'TW', language: 'zh-TW' },
+            (results, status) => {
+              if (status === 'OK' && results && results.length) {
+                const loc = results[0].geometry.location;
+                resolve({ lat: loc.lat(), lon: loc.lng(), display: results[0].formatted_address, approximate: results[0].partial_match === true });
+              } else { resolve(null); }
+            }
+          );
+        } catch (e) { resolve(null); }
+      });
+    }
+
+    async function postJSON(url, payload) {
+      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      return resp.json();
+    }
+
+    async function doSearch(payload) {
+      lastSearch = payload;
+      showAlert('');
+      document.getElementById('result').innerHTML = '';
+      showSpinner(true);
+      try {
+        const radius = parseInt(payload.radius, 10) || 500;
+        const net = currentNet();
+
+        if (payload.coord) {
+          const { lat, lon } = payload.coord;
+          const label = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+          const data = await postJSON('/api/query_coord', {
+            lat, lon, radius, net, query: label,
+            display_name: `${t('custom_coord')} ${label}`, approximate: false, source: 'Coordinate'
+          });
+          if (!data || !data.ok) { showAlert((data && data.error) || t('err_coord_none')); return; }
+          render(data); return;
+        }
+
+        const query = payload.mode === 'address'
+          ? `${payload.city || ''}${payload.district || ''}${payload.road || ''}${payload.number || ''}`.trim()
+          : (payload.keyword || '').trim();
+        if (!query) { showAlert(payload.mode === 'address' ? t('err_addr') : t('err_landmark')); return; }
+
+        async function viaGoogle() {
+          const g = await geocodeGoogle(query);
+          if (!g) return null;
+          return postJSON('/api/query_coord', { lat: g.lat, lon: g.lon, radius, net, query, display_name: g.display, approximate: g.approximate, source: 'Google' });
+        }
+
+        const searchPayload = Object.assign({}, payload, { net });
+        let data = null;
+        if (payload.mode === 'address') {
+          data = await postJSON('/api/search', searchPayload);
+          if (!data || !data.ok) { const gd = await viaGoogle(); if (gd) data = gd; }
+        } else {
+          data = await viaGoogle();
+          if (!data) data = await postJSON('/api/search', searchPayload);
+        }
+        if (!data || !data.ok) { showAlert((data && data.error) || t('err_notfound')); return; }
+        render(data);
+      } catch (e) {
+        showAlert(t('err_conn') + e.message);
+      } finally {
+        showSpinner(false);
+      }
+    }
+
+    function pointPopup(p) {
+      return `<b>${t('popup_signal')}: ${qlabel(p.quality)}</b><br>RSRP: ${fmt(p.rsrp)} dBm<br>SINR: ${fmt(p.sinr)} dB`
+        + `<br>${t('popup_dl')}: ${fmt(p.dl_mbps)} Mbps<br>${t('popup_dist')}: ${p.distance} m`;
+    }
+
+    function render(data) {
+      lastData = data;
+      layerGroup.clearLayers();
+      pointMarkers = [];
+      const c = [data.center.lat, data.center.lon];
+      const op = currentOpacity();
+
+      const circle = L.circle(c, { radius: data.radius, color: '#0066cc', weight: 2, fillColor: '#0066cc', fillOpacity: 0.06 }).addTo(layerGroup);
+      L.marker(c).addTo(layerGroup).bindPopup(`<b>${t('popup_pos')}</b><br>${data.display_name}`);
+
+      data.points.forEach(p => {
+        const m = L.circleMarker([p.lat, p.lon], {
+          radius: 5, color: p.color, fillColor: p.color,
+          fillOpacity: op, opacity: Math.min(1, op + 0.15), weight: 1
+        }).addTo(layerGroup).bindPopup(pointPopup(p));
+        pointMarkers.push(m);
+      });
+
+      map.fitBounds(circle.getBounds(), { padding: [40, 40] });
+
+      const s = data.summary;
+      const netLabel = data.net || currentNet();
+      let html = `
+        <div class="verdict-card" style="background:${s.verdict_color}">
+          <div class="net-badge">${netLabel} ${t('signal')}</div>
+          <div class="big">${qlabel(s.verdict)}</div>
+          <div class="sub">${detailText(s)}</div>
+        </div>`;
+      if (s.avg_rsrp !== undefined && s.avg_rsrp !== null) {
+        html += `
+        <div class="stats">
+          <div class="stat"><div class="v">${fmt(s.avg_rsrp)} <span>dBm</span></div><div class="l">${t('stat_rsrp')}</div></div>
+          <div class="stat"><div class="v">${fmt(s.avg_sinr)} <span>dB</span></div><div class="l">${t('stat_sinr')}</div></div>
+          <div class="stat"><div class="v">${fmt(s.avg_dl_mbps)} <span>Mbps</span></div><div class="l">${t('stat_dl')}</div></div>
+          <div class="stat"><div class="v">${fmt(s.poor_ratio)}%</div><div class="l">${t('stat_poor')}</div></div>
+          <div class="stat"><div class="v">${fmt(s.count)}</div><div class="l">${t('stat_count')}</div></div>
+          <div class="stat"><div class="v">${(s.total_mr || 0).toLocaleString()}</div><div class="l">${t('stat_mr')}</div></div>
+        </div>`;
+      }
+      if (data.approximate) {
+        html += `<div class="alert" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;margin:0 0 11px;">${t('approx')}</div>`;
+      }
+      html += `<div class="addr-line">📍 ${data.display_name}<br>${t('coord_label')}：<span class="mono">${data.center.lat.toFixed(6)}, ${data.center.lon.toFixed(6)}</span>　·　${t('src_label')}：${srclabel(data.source)}</div>`;
+      document.getElementById('result').innerHTML = html;
+    }
+
+    // ---------------------------------------------------------------------
+    // 按鈕事件
+    // ---------------------------------------------------------------------
+    document.getElementById('btn-address').addEventListener('click', () => {
+      doSearch({
+        mode: 'address',
+        city: document.getElementById('city').value,
+        district: document.getElementById('district').value,
+        road: document.getElementById('road').value,
+        number: document.getElementById('number').value,
+        radius: document.getElementById('radius-a').value
+      });
+    });
+
+    function parseLatLng(text) {
+      if (!text) return null;
+      const nums = text.replace(/[^0-9.\-]+/g, ' ').trim().split(/\s+/).map(Number);
+      if (nums.length < 2 || nums.some(isNaN)) return null;
+      const [lat, lon] = nums;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+      return { lat, lon };
+    }
+
+    document.getElementById('btn-landmark').addEventListener('click', () => {
+      const radius = document.getElementById('radius-l').value;
+      const latlngText = document.getElementById('latlng').value.trim();
+      if (latlngText) {
+        const coord = parseLatLng(latlngText);
+        if (!coord) { showAlert(t('err_coord_fmt')); return; }
+        doSearch({ mode: 'landmark', coord, radius }); return;
+      }
+      doSearch({ mode: 'landmark', keyword: document.getElementById('keyword').value, radius });
+    });
+
+    ['district', 'road', 'number'].forEach(id =>
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btn-address').click(); }));
+    ['keyword', 'latlng'].forEach(id =>
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btn-landmark').click(); }));
+
+    applyLang();
+  </script>
+</body>
+</html>
