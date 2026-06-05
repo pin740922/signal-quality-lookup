@@ -10,12 +10,14 @@
   4. 回傳格點明細與整體品質摘要
 """
 
+import io
 import json
 import math
 import os
 import re
 import threading
 import time
+import zipfile
 
 import numpy as np
 import pandas as pd
@@ -705,8 +707,40 @@ def api_search():
     })
 
 
-if __name__ == "__main__":
-    # 啟動時預先建立各網路別邊界框索引（首次較久，之後讀快取）
+def ensure_data():
+    """部署用：若資料不存在且設定了 DATA_URL，則自雲端下載 ZIP 並解壓到 DATA_BASE。
+
+    ZIP 內部結構需為 `TWM_MDT_City_25m/{4G,5G}/All/<City>/<City>.csv`，
+    DATA_BASE 會指向解壓後的 `TWM_MDT_City_25m` 目錄 (由環境變數 SIGNAL_DATA_BASE 設定)。
+    """
+    data_url = os.environ.get("DATA_URL", "").strip()
+    sample = os.path.join(DATA_BASE, "4G", "All")
+    if os.path.isdir(sample) and os.listdir(sample):
+        return  # 資料已存在
+    if not data_url:
+        return  # 無下載來源，維持本機既有資料
+    extract_to = os.path.dirname(os.path.abspath(DATA_BASE)) or "."
+    os.makedirs(extract_to, exist_ok=True)
+    print(f"[啟動] 下載資料中：{data_url}")
+    resp = requests.get(data_url, timeout=600)
+    resp.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        zf.extractall(extract_to)
+    print(f"[啟動] 資料已解壓至：{extract_to}")
+
+
+def bootstrap():
+    """資料就緒 + 建立各網路別邊界框索引（gunicorn / 直接執行皆會呼叫）。"""
+    try:
+        ensure_data()
+    except Exception as e:
+        print(f"[啟動] 資料下載失敗（將以現有資料運作）：{e}")
     for _net in NETWORKS:
         build_bbox_index(_net)
-    app.run(host="127.0.0.1", port=5000, debug=False)
+
+
+bootstrap()
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=int(os.environ.get("PORT", 5000)), debug=False)

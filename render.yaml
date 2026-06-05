@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: signal-quality-lookup
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 --preload --timeout 300 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: SIGNAL_DATA_BASE
+        value: /opt/render/project/src/data/TWM_MDT_City_25m
+      - key: DATA_URL
+        sync: false          # 部署時於 Render 後台填入 Google 雲端「直接下載」連結
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONIOENCODING
+        value: "utf-8"

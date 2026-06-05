@@ -107,15 +107,19 @@ python app.py
    git push -u origin main
    ```
 
-3. **主機端設定**：
-   - 下載並解壓資料到主機磁碟（例如 `/data/TWM_MDT_City_25m`）。
-   - 設定環境變數 `SIGNAL_DATA_BASE=/data/TWM_MDT_City_25m`（及選用的金鑰）。
-   - `pip install -r requirements.txt`，以正式 WSGI 伺服器啟動，例如：
+3. **主機端設定**（已內建開機自動下載資料）：
+   - 設定環境變數：
+     - `DATA_URL` = 雲端 ZIP 的**直接下載**連結（ZIP 內需為 `TWM_MDT_City_25m/{4G,5G}/All/...`）。
+     - `SIGNAL_DATA_BASE` = 解壓後的 `TWM_MDT_City_25m` 路徑。
+   - 啟動時程式會自動下載並解壓資料（若該路徑已有資料則略過），再建立索引。
+   - 啟動指令（已寫入 `Procfile` / `render.yaml`）：
 
      ```bash
-     pip install gunicorn
-     gunicorn -w 2 -b 0.0.0.0:$PORT app:app
+     gunicorn -w 1 --preload --timeout 300 -b 0.0.0.0:$PORT app:app
      ```
+
+   **以 Render 為例**：連結此 GitHub repo → Render 會讀取 `render.yaml` 自動建立服務 →
+   在後台把 `DATA_URL` 填入你的雲端連結 → Deploy 即可。
 
 ---
 

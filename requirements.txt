@@ -4,3 +4,4 @@ urllib3>=2.0
 pandas>=2.0
 numpy>=1.24
 pypinyin>=0.50
+gunicorn>=21.0
