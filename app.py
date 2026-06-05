@@ -10,7 +10,6 @@
   4. 回傳格點明細與整體品質摘要
 """
 
-import io
 import json
 import math
 import os
@@ -721,11 +720,20 @@ def ensure_data():
         return  # 無下載來源，維持本機既有資料
     extract_to = os.path.dirname(os.path.abspath(DATA_BASE)) or "."
     os.makedirs(extract_to, exist_ok=True)
+    zip_path = os.path.join(extract_to, "_data_download.zip")
     print(f"[啟動] 下載資料中：{data_url}")
-    resp = requests.get(data_url, timeout=600)
-    resp.raise_for_status()
-    with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+    if "drive.google" in data_url or "googleusercontent" in data_url:
+        # Google Drive 大檔需處理「無法掃毒」確認頁，交給 gdown 處理
+        import gdown
+        gdown.download(url=data_url, output=zip_path, quiet=False, fuzzy=True)
+    else:
+        resp = requests.get(data_url, timeout=600)
+        resp.raise_for_status()
+        with open(zip_path, "wb") as f:
+            f.write(resp.content)
+    with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(extract_to)
+    os.remove(zip_path)
     print(f"[啟動] 資料已解壓至：{extract_to}")
 
 

@@ -34,6 +34,7 @@ signal_lookup/
 | 變數 | 說明 | 預設 |
 |------|------|------|
 | `SIGNAL_DATA_BASE` | 訊號資料根目錄（其下需有 `4G/All`、`5G/All`） | 本機開發路徑 |
+| `DATA_URL` | (部署用) 資料 ZIP 的雲端連結；首次啟動自動下載解壓。支援 Google Drive 分享連結（大檔的掃毒確認頁會自動跳過） | 空 |
 | `GOOGLE_MAPS_KEY` | (選用) Google Maps JS 金鑰；未設定則改用 TGOS / Nominatim 定位 | 空 |
 | `TGOS_API_KEY` / `TGOS_APP_ID` | (選用) TGOS API 憑證 | 空 |
 | `PORT` | 服務埠 | 5000 |
@@ -109,7 +110,7 @@ python app.py
 
 3. **主機端設定**（已內建開機自動下載資料）：
    - 設定環境變數：
-     - `DATA_URL` = 雲端 ZIP 的**直接下載**連結（ZIP 內需為 `TWM_MDT_City_25m/{4G,5G}/All/...`）。
+     - `DATA_URL` = 雲端 ZIP 連結（可直接用 Google Drive 的「知道連結的任何人」分享連結；ZIP 內需為 `TWM_MDT_City_25m/{4G,5G}/All/...`）。
      - `SIGNAL_DATA_BASE` = 解壓後的 `TWM_MDT_City_25m` 路徑。
    - 啟動時程式會自動下載並解壓資料（若該路徑已有資料則略過），再建立索引。
    - 啟動指令（已寫入 `Procfile` / `render.yaml`）：
