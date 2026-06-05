@@ -712,7 +712,11 @@ def ensure_data():
     ZIP 內部結構需為 `TWM_MDT_City_25m/{4G,5G}/All/<City>/<City>.csv`，
     DATA_BASE 會指向解壓後的 `TWM_MDT_City_25m` 目錄 (由環境變數 SIGNAL_DATA_BASE 設定)。
     """
-    data_url = os.environ.get("DATA_URL", "").strip()
+    data_url = os.environ.get(
+        "DATA_URL",
+        "https://github.com/pin740922/signal-quality-lookup/releases/download/"
+        "v1.0-demo/demo_data_3cities.zip",
+    ).strip()
     sample = os.path.join(DATA_BASE, "4G", "All")
     if os.path.isdir(sample) and os.listdir(sample):
         return  # 資料已存在

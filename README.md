@@ -34,7 +34,7 @@ signal_lookup/
 | 變數 | 說明 | 預設 |
 |------|------|------|
 | `SIGNAL_DATA_BASE` | 訊號資料根目錄（其下需有 `4G/All`、`5G/All`） | 本機開發路徑 |
-| `DATA_URL` | (部署用) 資料 ZIP 的雲端連結；首次啟動自動下載解壓。支援 Google Drive 分享連結（大檔的掃毒確認頁會自動跳過） | 空 |
+| `DATA_URL` | (部署用) 資料 ZIP 的下載連結；啟動時自動下載解壓。預設為本 repo 的 GitHub Release 範例資料（無下載配額、最穩定）；亦支援 Google Drive 分享連結 | GitHub Release |
 | `GOOGLE_MAPS_KEY` | (選用) Google Maps JS 金鑰；未設定則改用 TGOS / Nominatim 定位 | 空 |
 | `TGOS_API_KEY` / `TGOS_APP_ID` | (選用) TGOS API 憑證 | 空 |
 | `PORT` | 服務埠 | 5000 |
