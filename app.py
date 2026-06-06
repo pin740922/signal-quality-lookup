@@ -213,17 +213,19 @@ def load_county(zh, net=DEFAULT_NET):
     df = pd.read_csv(path, usecols=usecols)
     n = len(df)
 
-    def col(key):
+    def col(key, dtype="float32"):
+        # 經緯度維持 float64 以確保距離計算精度；訊號數值用 float32 省一半記憶體。
         name = cols.get(key)
         if name and name in df.columns:
-            return df[name].to_numpy(dtype="float64")
-        return np.full(n, np.nan, dtype="float64")
+            return df[name].to_numpy(dtype=dtype)
+        return np.full(n, np.nan, dtype=dtype)
 
     data = {
-        "lon": col("lon"), "lat": col("lat"),
+        "lon": col("lon", "float64"), "lat": col("lat", "float64"),
         "rsrp": col("rsrp"), "rsrq": col("rsrq"), "sinr": col("sinr"),
         "dl": col("dl"), "mr": col("mr"), "cqi": col("cqi"),
     }
+    del df  # 釋放 pandas DataFrame，降低載入時的暫時記憶體尖峰
     with _cache_lock:
         _county_cache[cache_key] = data
     return data
@@ -773,7 +775,7 @@ def ensure_data():
     data_url = os.environ.get(
         "DATA_URL",
         "https://github.com/pin740922/signal-quality-lookup/releases/download/"
-        "v1.0-demo/demo_data_4cities.zip",
+        "v1.0-demo/demo_data_5cities.zip",
     ).strip()
     sample = os.path.join(DATA_BASE, "4G", "All")
     if os.path.isdir(sample) and os.listdir(sample):

@@ -14,8 +14,9 @@ CITIES = [
     "Taichung_City",
     "Kaohsiung_City",
     "Taoyuan_City",
+    "New_Taipei_City",
 ]
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo_data_4cities.zip")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demo_data_5cities.zip")
 
 
 def main():
