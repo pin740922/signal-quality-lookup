@@ -773,7 +773,7 @@ def ensure_data():
     data_url = os.environ.get(
         "DATA_URL",
         "https://github.com/pin740922/signal-quality-lookup/releases/download/"
-        "v1.0-demo/demo_data_3cities.zip",
+        "v1.0-demo/demo_data_4cities.zip",
     ).strip()
     sample = os.path.join(DATA_BASE, "4G", "All")
     if os.path.isdir(sample) and os.listdir(sample):

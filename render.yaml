@@ -9,7 +9,7 @@ services:
       - key: SIGNAL_DATA_BASE
         value: /opt/render/project/src/data/TWM_MDT_City_25m
       - key: DATA_URL
-        value: https://github.com/pin740922/signal-quality-lookup/releases/download/v1.0-demo/demo_data_3cities.zip
+        value: https://github.com/pin740922/signal-quality-lookup/releases/download/v1.0-demo/demo_data_4cities.zip
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: PYTHONIOENCODING
