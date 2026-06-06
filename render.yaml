@@ -14,3 +14,11 @@ services:
         value: "1"
       - key: PYTHONIOENCODING
         value: "utf-8"
+      # ---- AI 智慧判讀（Gemini OpenAI 相容端點）----
+      - key: AI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: AI_MODEL
+        value: gemini-2.5-flash
+      # 金鑰為機密，不寫進版控；請在 Render 後台 Environment 填入其值
+      - key: AI_API_KEY
+        sync: false
