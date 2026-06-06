@@ -125,6 +125,41 @@
     .addr-line { font-size: 12px; color: var(--muted); margin-top: 8px; word-break: break-all; line-height: 1.6; }
     .addr-line .mono { color: #0066cc; }
 
+    /* ---------- AI 智能分析（功能列按鈕 + 地圖懸浮視窗） ---------- */
+    .ai-fb-btn { border-color: #c4b5fd; color: #6d28d9; background: #f5f3ff; font-weight: 800; }
+    .ai-fb-btn:hover { background: #ede9fe; border-color: #a78bfa; }
+    .ai-fb-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .ai-float {
+      position: absolute; top: 64px; left: 16px; width: 372px; max-width: calc(100% - 32px);
+      z-index: 950; background: #fff; border: 1px solid #ddd6fe; border-radius: 14px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, .28); overflow: hidden; animation: aiPop .18s ease;
+    }
+    @keyframes aiPop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+    .ai-float-head {
+      display: flex; align-items: center; gap: 8px; padding: 11px 14px; color: #fff; font-size: 14px; font-weight: 800;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      cursor: move; user-select: none; touch-action: none;
+    }
+    .ai-float.dragging { box-shadow: 0 20px 48px rgba(15, 23, 42, .4); }
+    .ai-float-tag {
+      font-size: 10.5px; font-weight: 700; letter-spacing: .5px; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, .22); color: #fff;
+    }
+    .ai-float-tag.rule { background: rgba(255, 255, 255, .16); color: #e9d5ff; }
+    .ai-close {
+      margin-left: auto; cursor: pointer; background: rgba(255, 255, 255, .2); border: none; color: #fff;
+      width: 24px; height: 24px; border-radius: 7px; font-size: 16px; line-height: 1; display: grid; place-items: center; transition: .15s;
+    }
+    .ai-close:hover { background: rgba(255, 255, 255, .38); }
+    .ai-float-body { padding: 13px 14px; max-height: 62vh; overflow-y: auto; }
+    .ai-headline { font-weight: 800; color: #5b21b6; font-size: 15px; margin-bottom: 7px; line-height: 1.4; }
+    .ai-detail { font-size: 13.5px; line-height: 1.65; color: var(--text); }
+    ul.ai-advice { margin: 10px 0 0; padding-left: 18px; }
+    ul.ai-advice li { font-size: 13px; line-height: 1.6; color: #334155; margin: 4px 0; }
+    .ai-loading-row { display: flex; align-items: center; gap: 10px; color: #6d28d9; font-weight: 600; font-size: 13.5px; padding: 6px 2px; }
+    .ai-spin { width: 18px; height: 18px; border: 2.5px solid #e2e0f7; border-top-color: #7c3aed; border-radius: 50%; animation: spin .8s linear infinite; }
+
     /* ---------- Map ---------- */
     .map-wrap { flex: 1; position: relative; display: flex; flex-direction: column; }
     #map { flex: 1; width: 100%; background: #e8eef5; }
@@ -253,8 +288,18 @@
             <option value="0.1">10%</option>
           </select>
         </div>
+        <div class="fb-sep"></div>
+        <button class="fb-btn ai-fb-btn" id="ai-btn" data-i18n="ai_btn">🤖 AI 智能分析</button>
       </div>
       <div id="map"></div>
+      <div class="ai-float" id="ai-float" hidden>
+        <div class="ai-float-head">
+          <span>🤖 <span data-i18n="ai_title">AI 訊號判讀</span></span>
+          <span class="ai-float-tag" id="ai-float-tag" hidden></span>
+          <button class="ai-close" id="ai-close" aria-label="close">×</button>
+        </div>
+        <div class="ai-float-body" id="ai-float-body"></div>
+      </div>
       <div class="spinner" id="spinner"><div><div class="loader"></div><span data-i18n="searching">查詢中…</span></div></div>
       <div class="legend">
         <div class="legend-title" data-i18n="legend_title">RSRP 訊號強度</div>
@@ -329,6 +374,13 @@
       err_notfound: ['查無此位置，請確認輸入是否正確。', 'Location not found. Please verify your input.'],
       err_conn: ['連線發生問題：', 'Connection error: '],
       err_coord_fmt: ['經緯度格式不正確，請貼上如「25.033964, 121.564468」的座標。', 'Invalid coordinate format. Paste like "25.033964, 121.564468".'],
+      ai_btn: ['🤖 AI 智能分析', '🤖 AI Analysis'],
+      ai_loading: ['AI 分析中…', 'Analyzing…'],
+      ai_title: ['AI 訊號判讀', 'AI Signal Diagnosis'],
+      ai_tag_ai: ['AI 生成', 'AI'],
+      ai_tag_rule: ['規則式', 'Rule-based'],
+      ai_err: ['AI 判讀失敗，請稍後再試。', 'AI diagnosis failed, please try again.'],
+      ai_need_query: ['請先查詢一個位置，再進行 AI 分析。', 'Please run a location query first, then use AI analysis.'],
     };
     const QMAP = {
       '優良': 'Excellent', '良好': 'Good', '普通': 'Fair', '較弱': 'Weak', '微弱': 'Very weak',
@@ -505,6 +557,7 @@
       layerGroup.clearLayers();
       pointMarkers = [];
       lastData = null;
+      closeAiFloat();
       map.setView(INIT_CENTER, INIT_ZOOM);
     }
     document.querySelectorAll('.tab').forEach(tab => {
@@ -548,6 +601,7 @@
       lastSearch = payload;
       showAlert('');
       document.getElementById('result').innerHTML = '';
+      closeAiFloat();
       showSpinner(true);
       try {
         const radius = parseInt(payload.radius, 10) || 500;
@@ -642,6 +696,104 @@
       }
       html += `<div class="addr-line">📍 ${data.display_name}<br>${t('coord_label')}：<span class="mono">${data.center.lat.toFixed(6)}, ${data.center.lon.toFixed(6)}</span>　·　${t('src_label')}：${srclabel(data.source)}</div>`;
       document.getElementById('result').innerHTML = html;
+    }
+
+    // ---------------------------------------------------------------------
+    // AI 智能分析（地圖懸浮視窗）
+    // ---------------------------------------------------------------------
+    const aiBtn = document.getElementById('ai-btn');
+    const aiFloat = document.getElementById('ai-float');
+    const aiFloatBody = document.getElementById('ai-float-body');
+    const aiFloatTag = document.getElementById('ai-float-tag');
+
+    function closeAiFloat() {
+      aiFloat.hidden = true;
+      aiFloatBody.innerHTML = '';
+      aiFloatTag.hidden = true;
+    }
+    document.getElementById('ai-close').addEventListener('click', closeAiFloat);
+
+    // 讓懸浮視窗可用標題列拖曳移動（限制在地圖範圍內）
+    (function makeAiFloatDraggable() {
+      const head = aiFloat.querySelector('.ai-float-head');
+      let dragging = false, startX = 0, startY = 0, originX = 0, originY = 0;
+      head.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.ai-close')) return;
+        const parent = aiFloat.offsetParent || aiFloat.parentElement;
+        const pRect = parent.getBoundingClientRect();
+        const rect = aiFloat.getBoundingClientRect();
+        originX = rect.left - pRect.left;
+        originY = rect.top - pRect.top;
+        startX = e.clientX;
+        startY = e.clientY;
+        aiFloat.style.left = originX + 'px';
+        aiFloat.style.top = originY + 'px';
+        aiFloat.style.right = 'auto';
+        dragging = true;
+        aiFloat.classList.add('dragging');
+        head.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      head.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const parent = aiFloat.offsetParent || aiFloat.parentElement;
+        const maxX = parent.clientWidth - aiFloat.offsetWidth;
+        const maxY = parent.clientHeight - aiFloat.offsetHeight;
+        let nx = originX + (e.clientX - startX);
+        let ny = originY + (e.clientY - startY);
+        nx = Math.max(0, Math.min(nx, Math.max(0, maxX)));
+        ny = Math.max(0, Math.min(ny, Math.max(0, maxY)));
+        aiFloat.style.left = nx + 'px';
+        aiFloat.style.top = ny + 'px';
+      });
+      const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        aiFloat.classList.remove('dragging');
+        try { head.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+      head.addEventListener('pointerup', endDrag);
+      head.addEventListener('pointercancel', endDrag);
+    })();
+
+    aiBtn.addEventListener('click', () => {
+      const s = lastData && lastData.summary;
+      if (!lastData || !s || s.avg_rsrp === undefined || s.avg_rsrp === null) {
+        showAlert(t('ai_need_query'));
+        return;
+      }
+      requestAiDiagnose(lastData);
+    });
+
+    async function requestAiDiagnose(data) {
+      aiFloat.hidden = false;
+      aiFloatTag.hidden = true;
+      aiBtn.disabled = true;
+      aiFloatBody.innerHTML = `<div class="ai-loading-row"><span class="ai-spin"></span>${t('ai_loading')}</div>`;
+      try {
+        const r = await postJSON('/api/ai_diagnose', {
+          summary: data.summary,
+          net: data.net || currentNet(),
+          radius: data.radius,
+          display_name: data.display_name,
+          source: data.source,
+          lang: LANG === 'en' ? 'en' : 'zh'
+        });
+        if (!r || !r.ok) { aiFloatBody.innerHTML = `<div class="alert error" style="margin:0">${t('ai_err')}</div>`; return; }
+        aiFloatTag.hidden = false;
+        aiFloatTag.textContent = r.mode === 'ai' ? t('ai_tag_ai') : t('ai_tag_rule');
+        aiFloatTag.classList.toggle('rule', r.mode !== 'ai');
+        const advice = (r.advice && r.advice.length)
+          ? `<ul class="ai-advice">${r.advice.map(a => `<li>${a}</li>`).join('')}</ul>` : '';
+        aiFloatBody.innerHTML = `
+          ${r.headline ? `<div class="ai-headline">${r.headline}</div>` : ''}
+          <div class="ai-detail">${r.detail || ''}</div>
+          ${advice}`;
+      } catch (e) {
+        aiFloatBody.innerHTML = `<div class="alert error" style="margin:0">${t('ai_err')}</div>`;
+      } finally {
+        aiBtn.disabled = false;
+      }
     }
 
     // ---------------------------------------------------------------------

@@ -26,6 +26,7 @@ from flask import Flask, jsonify, render_template, request
 
 from postcode_mapping import all_counties, ZH_TO_EN
 from districts import districts_of, districts_of_i18n
+from ai_diagnose import diagnose as ai_diagnose, ai_available
 
 # ----------------------------------------------------------------------------
 # 設定
@@ -316,11 +317,13 @@ def summarize(points):
             "detail": "此位置方圓範圍內查無訊號量測資料，建議擴大查詢範圍或確認地址。",
         }
     def vals(key):
-        return np.array([p[key] for p in points if p[key] is not None], dtype="float64")
+        return np.array([p[key] for p in points if p.get(key) is not None], dtype="float64")
 
     rsrps = vals("rsrp")
     dls = vals("dl_mbps")
     sinrs = vals("sinr")
+    rsrqs = vals("rsrq")
+    cqis = vals("cqi")
     total_mr = int(sum(p["mr"] for p in points if p["mr"] is not None))
 
     if rsrps.size == 0:
@@ -343,16 +346,43 @@ def summarize(points):
     else:
         detail = "整體訊號覆蓋良好，多數位置可正常使用。"
 
+    # RSRP 五級品質分佈（百分比）
+    def pct(mask):
+        return round(float(np.mean(mask) * 100), 1)
+    quality_dist = {
+        "excellent": pct(rsrps >= -85),
+        "good": pct((rsrps >= -95) & (rsrps < -85)),
+        "fair": pct((rsrps >= -105) & (rsrps < -95)),
+        "weak": pct((rsrps >= -115) & (rsrps < -105)),
+        "very_weak": pct(rsrps < -115),
+    }
+
+    def r1(x):
+        return round(float(x), 1)
+
     return {
         "count": len(points),
         "verdict": verdict,
         "verdict_color": color,
         "avg_rsrp": round(avg_rsrp, 1),
-        "avg_sinr": round(float(np.mean(sinrs)), 1) if sinrs.size else None,
-        "avg_dl_mbps": round(float(np.mean(dls)), 1) if dls.size else None,
+        "avg_sinr": r1(np.mean(sinrs)) if sinrs.size else None,
+        "avg_dl_mbps": r1(np.mean(dls)) if dls.size else None,
         "poor_ratio": round(poor_ratio, 1),
         "total_mr": total_mr,
         "detail": detail,
+        # --- 深度分析用的擴充指標 ---
+        "avg_rsrq": r1(np.mean(rsrqs)) if rsrqs.size else None,
+        "avg_cqi": r1(np.mean(cqis)) if cqis.size else None,
+        "rsrp_min": r1(np.min(rsrps)),
+        "rsrp_max": r1(np.max(rsrps)),
+        "rsrp_std": r1(np.std(rsrps)),
+        "sinr_min": r1(np.min(sinrs)) if sinrs.size else None,
+        "sinr_neg_ratio": pct(sinrs < 0) if sinrs.size else None,
+        "dl_min": r1(np.min(dls)) if dls.size else None,
+        "dl_p10": r1(np.percentile(dls, 10)) if dls.size else None,
+        "dl_median": r1(np.median(dls)) if dls.size else None,
+        "quality_dist": quality_dist,
+        "nearest_m": int(min(p["distance"] for p in points)),
     }
 
 
@@ -615,6 +645,34 @@ def api_query_coord():
         "summary": summary,
         "points": points,
     })
+
+
+@app.route("/api/ai_diagnose", methods=["POST"])
+def api_ai_diagnose():
+    """AI 訊號判讀：以查詢結果的 summary 產生專業判讀與建議。
+
+    前端在拿到 /api/search 或 /api/query_coord 的結果後，把 summary 與情境
+    傳進來即可；未設定 LLM 金鑰時會自動退回規則式判讀。
+    """
+    body = request.get_json(force=True) or {}
+    summary = body.get("summary") or {}
+    if not isinstance(summary, dict):
+        return jsonify({"ok": False, "error": "缺少 summary。"}), 400
+    context = {
+        "net": (body.get("net") or DEFAULT_NET),
+        "radius": body.get("radius", DEFAULT_RADIUS_M),
+        "display_name": body.get("display_name", ""),
+        "source": body.get("source", ""),
+    }
+    lang = body.get("lang", "zh")
+    result = ai_diagnose(summary, context, lang)
+    return jsonify(result)
+
+
+@app.route("/api/ai_status")
+def api_ai_status():
+    """回報目前 AI 判讀模式（ai = 已接 LLM；rule = 規則式 fallback）。"""
+    return jsonify({"mode": "ai" if ai_available() else "rule"})
 
 
 @app.route("/api/counties")

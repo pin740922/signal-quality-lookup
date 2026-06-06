@@ -21,7 +21,8 @@ signal_lookup/
 ├── districts.py          # 各縣市行政區清單 + 中英對照 (pypinyin)
 ├── process_data.py       # 來源資料整理（建資料夾 / 搬移 / 合併）
 ├── app.py                # Flask 後端 (geocoding + 範圍查詢，支援 4G/5G)
-├── templates/index.html  # 前端地圖介面 (Leaflet，含中英切換)
+├── ai_diagnose.py        # AI 智慧判讀模組 (LLM + 規則式 fallback)
+├── templates/index.html  # 前端地圖介面 (Leaflet，含中英切換、AI 判讀按鈕)
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -37,6 +38,9 @@ signal_lookup/
 | `DATA_URL` | (部署用) 資料 ZIP 的下載連結；啟動時自動下載解壓。預設為本 repo 的 GitHub Release 範例資料（無下載配額、最穩定）；亦支援 Google Drive 分享連結 | GitHub Release |
 | `GOOGLE_MAPS_KEY` | (選用) Google Maps JS 金鑰；未設定則改用 TGOS / Nominatim 定位 | 空 |
 | `TGOS_API_KEY` / `TGOS_APP_ID` | (選用) TGOS API 憑證 | 空 |
+| `AI_API_KEY` | (選用) AI 判讀的 LLM 金鑰；**留空則自動使用規則式判讀** | 空 |
+| `AI_BASE_URL` | OpenAI 相容 API base url | `https://api.openai.com/v1` |
+| `AI_MODEL` | 模型名稱 | `gpt-4o-mini` |
 | `PORT` | 服務埠 | 5000 |
 
 > **資料不隨程式碼進版控**（約 1.9GB），請另存於雲端，部署時下載到伺服器並以
@@ -86,6 +90,28 @@ python app.py
 | 普通 | -95 ~ -105 | 黃 |
 | 較弱 | -105 ~ -115 | 橙 |
 | 微弱 | < -115 | 紅 |
+
+---
+
+## AI 智慧判讀 (PoC)
+
+把原本「規則式」的一句話判讀，升級為 LLM 產生的**專業診斷 + 可執行建議**（可區分覆蓋不足 / 干擾 / 容量壅塞）。
+
+- **前端**：查詢結果下方新增「🤖 AI 智慧判讀」按鈕，點擊後呼叫後端取得判讀並顯示。
+- **後端**：
+  - `POST /api/ai_diagnose`：輸入查詢結果的 `summary` + 情境，回傳 `{headline, detail, advice[]}`。
+  - `GET /api/ai_status`：回報目前模式（`ai` = 已接 LLM；`rule` = 規則式 fallback）。
+- **零金鑰也能跑**：未設定 `AI_API_KEY` 時自動退回強化版規則式判讀，先看效果再決定是否接 LLM。
+
+啟用 LLM（以 OpenAI 為例）：
+
+```powershell
+$env:AI_API_KEY="sk-..."        # 或設為 Azure / Gemini(相容端點) / 本地 Ollama
+$env:AI_MODEL="gpt-4o-mini"
+python app.py
+```
+
+> 金鑰只放在後端環境變數，不會外洩到前端。可複製 `.env.example` 參考設定。
 
 ---
 
