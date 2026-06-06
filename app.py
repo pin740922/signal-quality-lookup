@@ -677,9 +677,33 @@ def api_ai_status():
     return jsonify({"mode": "ai" if ai_available() else "rule"})
 
 
+_avail_cache = None
+
+
+def available_counties():
+    """回傳目前伺服器實際有資料 (4G 或 5G CSV 存在) 的縣市英文名集合。
+
+    依 DATA_BASE 上實際存在的合併檔判斷（部署環境僅含已發佈城市），
+    不可用 county_bbox 快取判斷，因為該快取含全部縣市。
+    """
+    global _avail_cache
+    if _avail_cache is not None:
+        return _avail_cache
+    avail = set()
+    for _zh, en in all_counties():
+        if any(os.path.exists(merged_csv_path(en, net)) for net in NETWORKS):
+            avail.add(en)
+    _avail_cache = avail
+    return avail
+
+
 @app.route("/api/counties")
 def api_counties():
-    return jsonify([{"zh": zh, "en": en} for zh, en in all_counties()])
+    avail = available_counties()
+    return jsonify([
+        {"zh": zh, "en": en, "available": en in avail}
+        for zh, en in all_counties()
+    ])
 
 
 @app.route("/api/districts")

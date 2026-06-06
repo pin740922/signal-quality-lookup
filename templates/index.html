@@ -171,6 +171,8 @@
     .fb-group { display: flex; align-items: center; gap: 8px; }
     .fb-group > span { color: var(--muted); }
     .map-funcbar select { width: auto; padding: 7px 10px; font-weight: 600; }
+    option.opt-disabled { color: #b8c0cc; }
+    #city option:disabled { color: #b8c0cc; }
     #net { min-width: 80px; border-color: var(--brand); color: var(--brand); font-weight: 800; background: #f0f7ff; }
     .fb-btn {
       background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px;
@@ -507,10 +509,16 @@
     const citySel = document.getElementById('city');
     const distSel = document.getElementById('district');
     let countyEn = {};
+    let countyAvail = {};
 
+    function cityLabel(zh) {
+      const base = (LANG === 'en') ? (countyEn[zh] || zh) : zh;
+      if (countyAvail[zh]) return base;
+      return base + (LANG === 'en' ? ' (no data)' : '（無資料）');
+    }
     function renderCityOptions() {
       Array.from(citySel.options).forEach(o => {
-        if (o.value) o.textContent = (LANG === 'en') ? (countyEn[o.value] || o.value) : o.value;
+        if (o.value) o.textContent = cityLabel(o.value);
       });
     }
     function updateDistrictPlaceholder() {
@@ -540,11 +548,17 @@
     fetch('/api/counties').then(r => r.json()).then(list => {
       list.forEach(c => {
         countyEn[c.zh] = c.en;
+        countyAvail[c.zh] = (c.available !== false);
         const o = document.createElement('option');
         o.value = c.zh; o.textContent = c.zh;
+        if (!countyAvail[c.zh]) { o.disabled = true; o.className = 'opt-disabled'; }
         citySel.appendChild(o);
       });
-      if (list.length) { renderCityOptions(); loadDistricts(citySel.value); }
+      // 預設選第一個有資料的城市，避免一開啟就停在無資料項目
+      const firstAvail = list.find(c => c.available !== false);
+      if (firstAvail) citySel.value = firstAvail.zh;
+      renderCityOptions();
+      if (citySel.value) loadDistricts(citySel.value);
     });
     citySel.addEventListener('change', () => loadDistricts(citySel.value));
 
