@@ -35,6 +35,7 @@ from flask import Flask, jsonify, render_template, request
 from postcode_mapping import all_counties, ZH_TO_EN
 from districts import districts_of, districts_of_i18n
 from ai_diagnose import diagnose as ai_diagnose, ai_available
+import rf_assistant
 
 # ----------------------------------------------------------------------------
 # 設定
@@ -698,6 +699,29 @@ def index():
     return render_template("index.html", google_key=GOOGLE_MAPS_KEY)
 
 
+@app.route("/assistant")
+def assistant():
+    """資深 RF 工程師問答助理頁面。"""
+    return render_template("assistant.html")
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    """RF 工程師問答助理（RAG + LLM）。"""
+    body = request.get_json(force=True) or {}
+    message = (body.get("message") or "").strip()
+    if not message:
+        return jsonify({"ok": False, "error": "請輸入問題。"}), 400
+    history = body.get("history") or []
+    lang = body.get("lang", "zh")
+    try:
+        result = rf_assistant.chat(message, history=history, lang=lang)
+    except Exception as e:  # noqa: BLE001
+        print(f"[api_chat] 失敗：{e}", flush=True)
+        return jsonify({"ok": False, "error": "助理暫時無法回應，請稍後再試。"}), 502
+    return jsonify(result)
+
+
 @app.route("/api/query_coord", methods=["POST"])
 def api_query_coord():
     """直接以經緯度查詢訊號 (前端 Google 定位成功後呼叫)。"""
@@ -930,6 +954,10 @@ def bootstrap():
         print(f"[啟動] 資料下載失敗（將以現有資料運作）：{e}")
     for _net in NETWORKS:
         build_bbox_index(_net)
+    try:
+        rf_assistant.load_knowledge()
+    except Exception as e:  # noqa: BLE001
+        print(f"[啟動] RF 助理知識庫載入失敗：{e}")
 
 
 bootstrap()

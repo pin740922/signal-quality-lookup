@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RF 工程師問答助理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #eef2f7; --panel: #fff; --panel-2: #f8fafc; --border: #e2e8f0;
+      --text: #1e293b; --muted: #64748b; --brand: #0066cc; --brand-dark: #00478f;
+      --user: #2563eb; --bot: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: "Inter", "Microsoft JhengHei", system-ui, sans-serif; color: var(--text); background: var(--bg); display: flex; flex-direction: column; height: 100vh; }
+    header {
+      display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+      background: linear-gradient(90deg, var(--brand-dark), var(--brand)); color: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.15);
+    }
+    header .logo { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 22px; background: rgba(255,255,255,.18); }
+    .head-titles h1 { font-size: 19px; margin: 0; font-weight: 800; }
+    .head-titles p { margin: 2px 0 0; font-size: 12px; color: rgba(255,255,255,.85); }
+    .head-actions { margin-left: auto; display: flex; gap: 10px; }
+    .ghost-btn { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 10px; padding: 9px 13px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .18s; text-decoration: none; white-space: nowrap; }
+    .ghost-btn:hover { background: rgba(255,255,255,.28); transform: translateY(-1px); }
+
+    .chat-wrap { flex: 1; display: flex; flex-direction: column; max-width: 900px; width: 100%; margin: 0 auto; min-height: 0; }
+    .messages { flex: 1; overflow-y: auto; padding: 22px 18px 8px; display: flex; flex-direction: column; gap: 14px; }
+    .messages::-webkit-scrollbar { width: 9px; }
+    .messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+    .msg { display: flex; gap: 10px; max-width: 86%; }
+    .msg .avatar { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-size: 18px; flex: 0 0 34px; }
+    .msg .bubble { padding: 12px 15px; border-radius: 14px; font-size: 14.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+    .msg.bot { align-self: flex-start; }
+    .msg.bot .avatar { background: #e0edff; }
+    .msg.bot .bubble { background: var(--bot); border: 1px solid var(--border); border-top-left-radius: 4px; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg.user .avatar { background: rgba(37,99,235,.15); }
+    .msg.user .bubble { background: var(--user); color: #fff; border-top-right-radius: 4px; }
+    .sources { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+    .sources span { background: #eef2ff; border: 1px solid #dbe2f5; border-radius: 6px; padding: 1px 7px; margin-right: 5px; }
+    .tag-ai, .tag-rule { font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+    .tag-ai { background: #dcfce7; color: #166534; }
+    .tag-rule { background: #fef9c3; color: #854d0e; }
+
+    .bubble h3, .bubble strong { font-weight: 700; }
+    .bubble ul { margin: 6px 0; padding-left: 20px; }
+    .bubble li { margin: 3px 0; }
+    .bubble code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px; font-family: "JetBrains Mono", monospace; font-size: 13px; }
+
+    .dots span { display: inline-block; width: 7px; height: 7px; margin: 0 2px; background: #94a3b8; border-radius: 50%; animation: bounce 1.2s infinite; }
+    .dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,80%,100% { transform: translateY(0); opacity:.5; } 40% { transform: translateY(-5px); opacity:1; } }
+
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 18px 4px; }
+    .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 7px 13px; font-size: 12.5px; color: var(--text); cursor: pointer; transition: .15s; }
+    .chip:hover { border-color: var(--brand); color: var(--brand); }
+
+    .composer { padding: 12px 18px 18px; }
+    .composer .box { display: flex; gap: 10px; align-items: flex-end; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 8px 8px 8px 14px; box-shadow: 0 4px 16px rgba(0,0,0,.05); }
+    .composer textarea { flex: 1; border: none; outline: none; resize: none; font-family: inherit; font-size: 14.5px; line-height: 1.5; max-height: 160px; background: transparent; color: var(--text); }
+    .send { background: var(--brand); color: #fff; border: none; border-radius: 11px; width: 42px; height: 42px; font-size: 18px; cursor: pointer; flex: 0 0 42px; transition: .15s; }
+    .send:hover { background: var(--brand-dark); }
+    .send:disabled { opacity: .5; cursor: not-allowed; }
+    .disclaimer { text-align: center; font-size: 11px; color: var(--muted); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🛠️</div>
+    <div class="head-titles">
+      <h1 data-i18n="title">資深 RF 工程師問答助理</h1>
+      <p data-i18n="subtitle">4G/5G 訊號優化、KPI 判讀、根因分析與客訴對應</p>
+    </div>
+    <div class="head-actions">
+      <a href="/" class="ghost-btn" data-i18n="back">← 訊號查詢系統</a>
+      <button id="lang-toggle" class="ghost-btn">🌐 EN</button>
+    </div>
+  </header>
+
+  <div class="chat-wrap">
+    <div class="messages" id="messages"></div>
+    <div class="suggestions" id="suggestions"></div>
+    <div class="composer">
+      <div class="box">
+        <textarea id="input" rows="1" data-i18n-ph="placeholder" placeholder="輸入你的 RF 問題，例如：SINR 偏低但 RSRP 正常，可能是什麼原因？"></textarea>
+        <button class="send" id="send" title="送出">➤</button>
+      </div>
+      <div class="disclaimer" data-i18n="disclaimer">本助理提供初步判讀與方向，實際派工/調參請以工程團隊完整資料複核。</div>
+    </div>
+  </div>
+
+  <script>
+    const I18N = {
+      title: ['資深 RF 工程師問答助理', 'Senior RF Engineer Assistant'],
+      subtitle: ['4G/5G 訊號優化、KPI 判讀、根因分析與客訴對應', '4G/5G optimization, KPI interpretation, root-cause & customer-support'],
+      back: ['← 訊號查詢系統', '← Signal Lookup'],
+      placeholder: ['輸入你的 RF 問題，例如：SINR 偏低但 RSRP 正常，可能是什麼原因？', 'Ask an RF question, e.g. SINR is low but RSRP is fine — why?'],
+      disclaimer: ['本助理提供初步判讀與方向，實際派工/調參請以工程團隊完整資料複核。', 'This assistant gives preliminary guidance; verify with full engineering data before any action.'],
+      greeting: [
+        '你好，我是資深 RF 工程師助理。可以問我 4G/5G 訊號 KPI 判讀（RSRP/RSRQ/SINR/CQI）、PA 弱覆蓋區判定、根因分析（覆蓋/干擾/容量）與客訴對應。有什麼可以幫你？',
+        "Hi, I'm your senior RF engineer assistant. Ask me about 4G/5G KPIs (RSRP/RSRQ/SINR/CQI), PA weak-coverage detection, root-cause analysis (coverage/interference/capacity) and customer-support handling. How can I help?"
+      ],
+      sources_label: ['參考來源', 'Sources'],
+      err: ['助理暫時無法回應，請稍後再試。', 'The assistant is temporarily unavailable, please try again.'],
+      thinking: ['思考中', 'Thinking'],
+    };
+    const SUGGESTIONS = [
+      ['4G PA 區域怎麼判定？', 'How is a 4G PA area defined?'],
+      ['RSRP 正常但 SINR 偏低，可能原因與對策？', 'RSRP ok but SINR low — causes and fixes?'],
+      ['用戶說在家收訊差、上網慢，怎麼判讀與回覆？', 'Customer: poor reception & slow data at home — how to respond?'],
+      ['PoorRSRPPercentage 是什麼意思？', 'What is PoorRSRPPercentage?'],
+    ];
+
+    let LANG = 'zh';
+    const idx = () => (LANG === 'en' ? 1 : 0);
+    const t = (k) => (I18N[k] ? I18N[k][idx()] : k);
+    const history = [];
+
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const langBtn = document.getElementById('lang-toggle');
+    const suggEl = document.getElementById('suggestions');
+
+    // 將純文字輕量轉為 HTML（**粗體**、- 條列、`code`、換行）
+    function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function renderMarkdown(text) {
+      const lines = escapeHtml(text).split('\n');
+      let html = '', inList = false;
+      for (let line of lines) {
+        line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`(.+?)`/g, '<code>$1</code>');
+        const m = line.match(/^\s*[-*•]\s+(.*)$/);
+        if (m) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${m[1]}</li>`; }
+        else { if (inList) { html += '</ul>'; inList = false; } html += line.trim() ? `<div>${line}</div>` : '<div style="height:6px"></div>'; }
+      }
+      if (inList) html += '</ul>';
+      return html;
+    }
+
+    function addMessage(role, text, opts = {}) {
+      const wrap = document.createElement('div');
+      wrap.className = `msg ${role}`;
+      const avatar = role === 'user' ? '🧑‍💼' : '🛠️';
+      let inner = `<div class="avatar">${avatar}</div><div class="bubble">`;
+      if (opts.html) inner += opts.html; else inner += role === 'bot' ? renderMarkdown(text) : escapeHtml(text);
+      if (opts.tag) inner += `<span class="${opts.tag === 'ai' ? 'tag-ai' : 'tag-rule'}">${opts.tag === 'ai' ? 'AI' : (LANG==='en'?'KB':'知識庫')}</span>`;
+      if (opts.sources && opts.sources.length) {
+        inner += `<div class="sources">${t('sources_label')}：${opts.sources.map(s => `<span>${escapeHtml(s)}</span>`).join('')}</div>`;
+      }
+      inner += '</div>';
+      wrap.innerHTML = inner;
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return wrap;
+    }
+
+    function renderSuggestions() {
+      suggEl.innerHTML = '';
+      SUGGESTIONS.forEach(s => {
+        const c = document.createElement('div');
+        c.className = 'chip'; c.textContent = s[idx()];
+        c.addEventListener('click', () => { inputEl.value = s[idx()]; send(); });
+        suggEl.appendChild(c);
+      });
+    }
+
+    let busy = false;
+    async function send() {
+      const text = inputEl.value.trim();
+      if (!text || busy) return;
+      busy = true; sendBtn.disabled = true;
+      inputEl.value = ''; autoGrow();
+      addMessage('user', text);
+      const typing = addMessage('bot', '', { html: `<span class="dots"><span></span><span></span><span></span></span>` });
+      try {
+        const resp = await fetch('/api/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history, lang: LANG })
+        });
+        const data = await resp.json();
+        typing.remove();
+        if (!data || !data.ok) { addMessage('bot', (data && data.error) || t('err')); }
+        else {
+          addMessage('bot', data.answer, { tag: data.mode === 'ai' ? 'ai' : 'rule', sources: data.sources });
+          history.push({ role: 'user', content: text });
+          history.push({ role: 'assistant', content: data.answer });
+        }
+      } catch (e) {
+        typing.remove();
+        addMessage('bot', t('err'));
+      } finally {
+        busy = false; sendBtn.disabled = false; inputEl.focus();
+      }
+    }
+
+    function autoGrow() { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px'; }
+    inputEl.addEventListener('input', autoGrow);
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+    sendBtn.addEventListener('click', send);
+
+    function applyLang() {
+      document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-Hant';
+      document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+      document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+      langBtn.textContent = LANG === 'en' ? '🌐 中文' : '🌐 EN';
+      renderSuggestions();
+    }
+    langBtn.addEventListener('click', () => { LANG = LANG === 'en' ? 'zh' : 'en'; applyLang(); });
+
+    applyLang();
+    addMessage('bot', t('greeting'));
+    inputEl.focus();
+  </script>
+</body>
+</html>
