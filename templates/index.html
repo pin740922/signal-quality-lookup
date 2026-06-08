@@ -96,9 +96,16 @@
     }
     button.search:hover { box-shadow: 0 8px 22px rgba(0, 102, 204, .32); transform: translateY(-1px); filter: brightness(1.03); }
     button.search:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
-    .radius-row { display: flex; gap: 10px; align-items: stretch; }
-    .radius-row input { width: 96px; flex: 0 0 96px; }
-    .radius-row button.search { margin-top: 0; flex: 1; width: auto; }
+    .radius-row { display: flex; gap: 8px; align-items: stretch; }
+    .radius-row input { width: 84px; flex: 0 0 84px; }
+    .radius-row button.search { margin-top: 0; flex: 1; width: auto; padding: 12px 8px; }
+    .edit-icon-btn {
+      flex: 0 0 46px; width: 46px; margin-top: 0; padding: 0; font-size: 17px; cursor: pointer;
+      background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 10px; transition: .15s;
+    }
+    .edit-icon-btn:hover:not(:disabled) { border-color: #0066cc; background: #eff6ff; }
+    .edit-icon-btn.active { background: #0066cc; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,.18); }
+    .edit-icon-btn:disabled { opacity: .4; cursor: not-allowed; }
     .hint { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.55; }
 
     /* ---------- Result ---------- */
@@ -134,6 +141,43 @@
     .weak-fb-btn { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; font-weight: 800; }
     .weak-fb-btn:hover { background: #fee2e2; border-color: #f87171; }
     .weak-fb-btn.active { background: #dc2626; color: #fff; border-color: #dc2626; }
+    /* 衛星圖資切換鈕 */
+    .map-sat-ctrl a {
+      width: 34px; height: 34px; line-height: 34px; text-align: center; font-size: 18px;
+      background: #fff; cursor: pointer; display: block; text-decoration: none;
+    }
+    .map-sat-ctrl a.active { background: #0066cc; }
+
+    /* 可拖曳圓的控制點 */
+    .center-handle, .center-handle * { cursor: move !important; }
+    .center-handle .ch-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #0066cc; border: 3px solid #fff; box-sizing: border-box;
+      box-shadow: 0 0 0 1px #0066cc, 0 1px 4px rgba(0,0,0,.4);
+    }
+    .radius-handle, .radius-handle * { cursor: ew-resize !important; }
+    .radius-handle .rh-dot {
+      width: 14px; height: 14px; border-radius: 4px;
+      background: #fff; border: 3px solid #0066cc; box-sizing: border-box;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+
+    /* 可拖曳圓「確定」浮動列 */
+    .edit-confirm[hidden] { display: none !important; }
+    .edit-confirm {
+      position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+      z-index: 960; background: #fff; border: 1px solid var(--border); border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, .22); padding: 9px 12px;
+      display: flex; align-items: center; gap: 10px; font-size: 13px; max-width: calc(100% - 32px);
+      animation: aiPop .18s ease;
+    }
+    .edit-confirm .edit-radius { color: var(--muted); font-family: "JetBrains Mono", monospace; white-space: nowrap; }
+    .edit-btn { border: none; border-radius: 9px; padding: 8px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .edit-btn.ok { background: #16a34a; color: #fff; }
+    .edit-btn.ok:hover { background: #15803d; }
+    .edit-btn.cancel { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+    .edit-btn.cancel:hover { background: #e2e8f0; }
+
     /* 弱訊區域標籤 (Leaflet tooltip) */
     .weak-zone-tip {
       background: rgba(220, 38, 38, .92); color: #fff; font-size: 11px; font-weight: 800;
@@ -257,6 +301,7 @@
         <label data-i18n="label_radius">查詢半徑 (公尺)</label>
         <div class="radius-row">
           <input id="radius-a" type="number" value="500" min="100" max="2000" step="100" />
+          <button class="edit-icon-btn" id="edit-a" type="button" disabled data-i18n-title="edit_btn_title" title="在地圖上編輯查詢範圍">✏️</button>
           <button class="search" id="btn-address" data-i18n="btn_search">查詢訊號品質</button>
         </div>
         <p class="hint" data-i18n="hint_address">系統會將地址轉換為經緯度，顯示該位置方圓範圍內的訊號格點。</p>
@@ -271,6 +316,7 @@
         <label data-i18n="label_radius">查詢半徑 (公尺)</label>
         <div class="radius-row">
           <input id="radius-l" type="number" value="500" min="100" max="2000" step="100" />
+          <button class="edit-icon-btn" id="edit-l" type="button" disabled data-i18n-title="edit_btn_title" title="在地圖上編輯查詢範圍">✏️</button>
           <button class="search" id="btn-landmark" data-i18n="btn_search">查詢訊號品質</button>
         </div>
         <p class="hint" data-i18n-html="hint_landmark">可輸入地標名稱，或在 Google 地圖對地點按右鍵複製「經緯度」貼到上方欄位。<br>兩者皆填時，以經緯度為準。</p>
@@ -324,6 +370,11 @@
         <div class="item"><span class="dot" style="background:#d4d43b"></span><span data-i18n="q_fair">普通 (-105 ~ -95)</span></div>
         <div class="item"><span class="dot" style="background:#f6b26b"></span><span data-i18n="q_weak">較弱 (-115 ~ -105)</span></div>
         <div class="item"><span class="dot" style="background:#e60000"></span><span data-i18n="q_vweak">微弱 (< -115)</span></div>
+      </div>
+      <div class="edit-confirm" id="edit-confirm" hidden>
+        <span class="edit-radius" id="edit-radius-label"></span>
+        <button class="edit-btn ok" id="edit-confirm-btn">✓ <span data-i18n="edit_reload">確定查詢此範圍</span></button>
+        <button class="edit-btn cancel" id="edit-cancel-btn" data-i18n="edit_cancel">取消</button>
       </div>
     </div>
   </div>
@@ -406,6 +457,10 @@
       weak_pts: ['PA 格點', 'PA points'],
       weak_avg: ['平均 RSRP', 'Avg RSRP'],
       weak_min: ['最低 RSRP', 'Min RSRP'],
+      edit_radius: ['半徑', 'Radius'],
+      edit_reload: ['確定查詢此範圍', 'Search this area'],
+      edit_cancel: ['取消', 'Cancel'],
+      edit_btn_title: ['在地圖上編輯查詢範圍（拖曳圓心移動、拖曳外圈改半徑）', 'Edit query area on map (drag center to move, drag ring to resize)'],
     };
     const QMAP = {
       '優良': 'Excellent', '良好': 'Good', '普通': 'Fair', '較弱': 'Weak', '微弱': 'Very weak',
@@ -446,6 +501,7 @@
       document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
       document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
       document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+      document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
       if (copyBtn && !copyBtn.classList.contains('done')) copyBtn.textContent = t('fb_copy');
       langBtn.textContent = (LANG === 'en') ? '🌐 中文' : '🌐 EN';
       setMapTheme(LANG === 'en');
@@ -472,8 +528,35 @@
     const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
     });
+    const satTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
+    });
     let mapDark = false;
+    let mapSat = false;
     lightTiles.addTo(map);
+
+    // 衛星圖資切換鈕（地圖右上角）
+    const SatControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd() {
+        const div = L.DomUtil.create('div', 'leaflet-bar map-sat-ctrl');
+        const a = L.DomUtil.create('a', '', div);
+        a.href = '#'; a.id = 'sat-btn'; a.title = '衛星圖資 / 街道圖'; a.innerHTML = '🛰️';
+        L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', toggleSatellite);
+        return div;
+      }
+    });
+    map.addControl(new SatControl());
+
+    function applyBaseLayer() {
+      [lightTiles, darkTiles, satTiles].forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+      const base = mapSat ? satTiles : (mapDark ? darkTiles : lightTiles);
+      base.addTo(map); base.bringToBack();
+      document.body.classList.toggle('dark-map', mapDark || mapSat);
+      const btn = document.getElementById('sat-btn');
+      if (btn) { btn.innerHTML = mapSat ? '🗺️' : '🛰️'; btn.classList.toggle('active', mapSat); }
+    }
+    function toggleSatellite() { mapSat = !mapSat; applyBaseLayer(); }
 
     let layerGroup = L.layerGroup().addTo(map);
     let weakLayer = L.layerGroup().addTo(map);
@@ -481,6 +564,12 @@
     let weakShown = false;
     let lastSearch = null;
     let lastData = null;
+    let queryCircle = null;   // 目前查詢圓（可拖曳編輯）
+    let editState = null;     // 編輯後的 { lat, lon, radius }
+    let editMode = false;     // 是否在地圖編輯模式
+    let centerPin = null;     // 中心圖釘
+    let centerHandle = null;  // 編輯模式：圓心拖曳控制點
+    let radiusHandle = null;  // 編輯模式：半徑拖曳控制點
 
     const copyBtn = document.getElementById('copy-center');
     const langBtn = document.getElementById('lang-toggle');
@@ -493,13 +582,11 @@
       document.getElementById('alert-box').innerHTML = msg ? `<div class="alert error">${msg}</div>` : '';
     }
 
-    // 地圖深淺色跟著語言走：中文=亮色、English=深色
+    // 地圖深淺色跟著語言走：中文=亮色、English=深色（衛星模式時保留衛星底圖）
     function setMapTheme(dark) {
       if (dark === mapDark) return;
       mapDark = dark;
-      document.body.classList.toggle('dark-map', mapDark);
-      if (mapDark) { map.removeLayer(lightTiles); darkTiles.addTo(map); darkTiles.bringToBack(); }
-      else { map.removeLayer(darkTiles); lightTiles.addTo(map); lightTiles.bringToBack(); }
+      applyBaseLayer();
     }
 
     langBtn.addEventListener('click', () => { LANG = (LANG === 'en') ? 'zh' : 'en'; applyLang(); });
@@ -593,6 +680,11 @@
     function resetView() {
       showAlert('');
       document.getElementById('result').innerHTML = '';
+      exitEditMode();
+      setEditButtonsEnabled(false);
+      queryCircle = null;
+      centerPin = null;
+      editState = null;
       layerGroup.clearLayers();
       clearWeak();
       pointMarkers = [];
@@ -694,6 +786,9 @@
 
     function render(data) {
       lastData = data;
+      exitEditMode();
+      queryCircle = null;
+      centerPin = null;
       layerGroup.clearLayers();
       clearWeak();
       pointMarkers = [];
@@ -701,7 +796,11 @@
       const op = currentOpacity();
 
       const circle = L.circle(c, { radius: data.radius, color: '#0066cc', weight: 2, fillColor: '#0066cc', fillOpacity: 0.06 }).addTo(layerGroup);
-      L.marker(c).addTo(layerGroup).bindPopup(`<b>${t('popup_pos')}</b><br>${data.display_name}`);
+      const centerMarker = L.marker(c).addTo(layerGroup).bindPopup(`<b>${t('popup_pos')}</b><br>${data.display_name}`);
+      queryCircle = circle;
+      centerPin = centerMarker;
+      editState = { lat: data.center.lat, lon: data.center.lon, radius: Math.round(data.radius) };
+      setEditButtonsEnabled(true);
 
       data.points.forEach(p => {
         const m = L.circleMarker([p.lat, p.lon], {
@@ -738,6 +837,123 @@
       html += `<div class="addr-line">📍 ${data.display_name}<br>${t('coord_label')}：<span class="mono">${data.center.lat.toFixed(6)}, ${data.center.lon.toFixed(6)}</span>　·　${t('src_label')}：${srclabel(data.source)}</div>`;
       document.getElementById('result').innerHTML = html;
     }
+
+    // ---------------------------------------------------------------------
+    // 可拖曳查詢圓：點「Edit」進入編輯模式，拖圓心移動、拖外圈改半徑，
+    // 按「確定查詢此範圍」重新查詢並結束編輯。
+    // ---------------------------------------------------------------------
+    const editConfirmEl = document.getElementById('edit-confirm');
+    const editRadiusLabel = document.getElementById('edit-radius-label');
+    const editBtnA = document.getElementById('edit-a');
+    const editBtnL = document.getElementById('edit-l');
+
+    function setEditButtonsEnabled(on) {
+      [editBtnA, editBtnL].forEach(b => { if (b) b.disabled = !on; });
+    }
+    function setEditButtonsActive(on) {
+      [editBtnA, editBtnL].forEach(b => { if (b) b.classList.toggle('active', on); });
+    }
+    function hideEditConfirm() { if (editConfirmEl) editConfirmEl.hidden = true; }
+    function showEditConfirm() {
+      if (!editConfirmEl || !editState) return;
+      editRadiusLabel.textContent = `${t('coord_label')}: ${editState.lat.toFixed(5)}, ${editState.lon.toFixed(5)} · ${t('edit_radius')}: ${editState.radius} m`;
+      editConfirmEl.hidden = false;
+    }
+
+    // 圓心正東方、距離 r 公尺的點（用來放置半徑控制點）
+    function pointEastAt(lat, lon, r) {
+      const dLon = r / (111320 * Math.cos(lat * Math.PI / 180));
+      return L.latLng(lat, lon + dLon);
+    }
+
+    function enterEditMode() {
+      if (!queryCircle || editMode) return;
+      editMode = true;
+      setEditButtonsActive(true);
+      const ctr = queryCircle.getLatLng();
+      const r = queryCircle.getRadius();
+      editState = { lat: ctr.lat, lon: ctr.lng, radius: Math.round(r) };
+
+      // 編輯時隱藏一般圖釘，避免擋住圓心控制點
+      if (centerPin) { centerPin.closePopup(); layerGroup.removeLayer(centerPin); }
+
+      const centerIcon = L.divIcon({ className: 'center-handle', html: '<div class="ch-dot"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
+      const radiusIcon = L.divIcon({ className: 'radius-handle', html: '<div class="rh-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+
+      centerHandle = L.marker(ctr, { draggable: true, icon: centerIcon, zIndexOffset: 1000 }).addTo(layerGroup);
+      radiusHandle = L.marker(pointEastAt(ctr.lat, ctr.lng, r), { draggable: true, icon: radiusIcon, zIndexOffset: 1000 }).addTo(layerGroup);
+
+      centerHandle.on('drag', () => {
+        const p = centerHandle.getLatLng();
+        queryCircle.setLatLng(p);
+        radiusHandle.setLatLng(pointEastAt(p.lat, p.lng, editState.radius));
+        editState.lat = p.lat; editState.lon = p.lng;
+        showEditConfirm();
+      });
+      radiusHandle.on('drag', () => {
+        const cc = queryCircle.getLatLng();
+        const hp = radiusHandle.getLatLng();
+        let nr = haversineM(cc.lat, cc.lng, hp.lat, hp.lng);
+        nr = Math.max(50, Math.min(5000, Math.round(nr)));
+        queryCircle.setRadius(nr);
+        editState.radius = nr;
+        showEditConfirm();
+      });
+
+      showEditConfirm();
+    }
+
+    function exitEditMode() {
+      editMode = false;
+      setEditButtonsActive(false);
+      hideEditConfirm();
+      if (centerHandle) { layerGroup.removeLayer(centerHandle); centerHandle = null; }
+      if (radiusHandle) { layerGroup.removeLayer(radiusHandle); radiusHandle = null; }
+    }
+
+    function toggleEditMode() {
+      if (!queryCircle) return;
+      if (editMode) { if (lastData) render(lastData); }   // 取消編輯：還原原本範圍
+      else { enterEditMode(); }
+    }
+
+    if (editBtnA) editBtnA.addEventListener('click', toggleEditMode);
+    if (editBtnL) editBtnL.addEventListener('click', toggleEditMode);
+
+    async function reloadEdited() {
+      if (!editState || !lastData) return;
+      hideEditConfirm();
+      showSpinner(true);
+      try {
+        const label = `${editState.lat.toFixed(6)}, ${editState.lon.toFixed(6)}`;
+        const moved = (Math.abs(editState.lat - lastData.center.lat) > 1e-6 || Math.abs(editState.lon - lastData.center.lon) > 1e-6);
+        const data = await postJSON('/api/query_coord', {
+          lat: editState.lat, lon: editState.lon, radius: editState.radius,
+          net: currentNet(),
+          query: lastData.query || '',
+          display_name: moved ? `${t('custom_coord')} ${label}` : (lastData.display_name || label),
+          approximate: false,
+          source: moved ? 'Coordinate' : (lastData.source || 'Coordinate')
+        });
+        if (!data || !data.ok) { showAlert((data && data.error) || t('err_coord_none')); return; }
+        // 同步側欄半徑輸入與上次查詢條件
+        const rl = document.getElementById('radius-l'), ra = document.getElementById('radius-a');
+        if (rl) rl.value = editState.radius;
+        if (ra) ra.value = editState.radius;
+        if (lastSearch) lastSearch.radius = editState.radius;
+        render(data);
+      } catch (e) {
+        showAlert(t('err_conn') + e.message);
+      } finally {
+        showSpinner(false);
+      }
+    }
+
+    document.getElementById('edit-confirm-btn').addEventListener('click', reloadEdited);
+    document.getElementById('edit-cancel-btn').addEventListener('click', () => {
+      hideEditConfirm();
+      if (lastData) render(lastData);   // 還原為原本範圍
+    });
 
     // ---------------------------------------------------------------------
     // AI 智能分析（地圖懸浮視窗）

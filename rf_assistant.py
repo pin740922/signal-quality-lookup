@@ -173,7 +173,9 @@ def _system_prompt(lang):
             "company-specific rules; if the context is insufficient, rely on solid RF fundamentals but DO NOT "
             "invent specific numbers, standards clauses, or company policies. If unsure, say so. "
             "When relevant, explain root cause across coverage / interference / capacity / mobility, and give "
-            "actionable next steps. Keep answers concise and well-organized (use short bullets when helpful)."
+            "actionable next steps. Keep answers concise and well-organized (use short bullets when helpful). "
+            "IMPORTANT: Write your ENTIRE response in English, even if the question or the knowledge context "
+            "is written in Chinese. Translate any Chinese terms/values from the context into English."
         )
     return (
         "你是一位資深的 RF / RAN（無線接取網路）優化工程師，擁有 15 年以上 4G LTE 與 5G NR 的網路規劃、"
@@ -182,6 +184,7 @@ def _system_prompt(lang):
         "但『不要捏造』具體數值、規範條文或公司政策。不確定就明說。"
         "適當時請從『覆蓋 / 干擾 / 容量 / 移動性』面向做根因分析，並給出可執行的後續步驟。"
         "回答力求精簡、有結構（必要時用簡短條列）。"
+        "重要：無論問題或知識庫內容使用何種語言，請一律以『繁體中文』作答。"
     )
 
 
@@ -199,6 +202,10 @@ def _build_messages(history, user_msg, contexts, lang):
         content = str(m.get("content", "")).strip()
         if content:
             msgs.append({"role": role, "content": content})
+    # 強化語言指令（緊鄰使用者問題，避免被前文中文內容帶偏）
+    lang_directive = ("Reminder: respond in English only."
+                      if lang == "en" else "提醒：請以繁體中文回答。")
+    msgs.append({"role": "system", "content": lang_directive})
     msgs.append({"role": "user", "content": user_msg})
     return msgs
 

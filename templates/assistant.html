@@ -209,7 +209,12 @@
       langBtn.textContent = LANG === 'en' ? '🌐 中文' : '🌐 EN';
       renderSuggestions();
     }
-    langBtn.addEventListener('click', () => { LANG = LANG === 'en' ? 'zh' : 'en'; applyLang(); });
+    langBtn.addEventListener('click', () => {
+      LANG = LANG === 'en' ? 'zh' : 'en';
+      applyLang();
+      // 對話尚未開始時，切換語言同步更新開場白
+      if (history.length === 0) { messagesEl.innerHTML = ''; addMessage('bot', t('greeting')); }
+    });
 
     applyLang();
     addMessage('bot', t('greeting'));
