@@ -130,6 +130,18 @@
     .ai-fb-btn:hover { background: #ede9fe; border-color: #a78bfa; }
     .ai-fb-btn:disabled { opacity: .55; cursor: not-allowed; }
 
+    /* 框選弱訊區域按鈕 */
+    .weak-fb-btn { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; font-weight: 800; }
+    .weak-fb-btn:hover { background: #fee2e2; border-color: #f87171; }
+    .weak-fb-btn.active { background: #dc2626; color: #fff; border-color: #dc2626; }
+    /* 弱訊區域標籤 (Leaflet tooltip) */
+    .weak-zone-tip {
+      background: rgba(220, 38, 38, .92); color: #fff; font-size: 11px; font-weight: 800;
+      padding: 2px 7px; border-radius: 7px; white-space: nowrap; border: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+    }
+    .weak-zone-tip::before { display: none; }
+
     .ai-float {
       position: absolute; top: 64px; left: 16px; width: 372px; max-width: calc(100% - 32px);
       z-index: 950; background: #fff; border: 1px solid #ddd6fe; border-radius: 14px;
@@ -292,6 +304,7 @@
         </div>
         <div class="fb-sep"></div>
         <button class="fb-btn ai-fb-btn" id="ai-btn" data-i18n="ai_btn">🤖 AI 智能分析</button>
+        <button class="fb-btn weak-fb-btn" id="weak-btn" data-i18n="weak_btn">⚠️ 框選出弱訊區域</button>
       </div>
       <div id="map"></div>
       <div class="ai-float" id="ai-float" hidden>
@@ -383,6 +396,14 @@
       ai_tag_rule: ['規則式', 'Rule-based'],
       ai_err: ['AI 判讀失敗，請稍後再試。', 'AI diagnosis failed, please try again.'],
       ai_need_query: ['請先查詢一個位置，再進行 AI 分析。', 'Please run a location query first, then use AI analysis.'],
+      weak_btn: ['⚠️ 框選出弱訊區域', '⚠️ Outline weak areas'],
+      weak_btn_clear: ['✖ 清除弱訊框選', '✖ Clear weak areas'],
+      weak_need_query: ['請先查詢一個位置，再框選弱訊區域。', 'Please run a location query first, then outline weak areas.'],
+      weak_none: ['此範圍內未發現明顯弱訊區域 (RSRP < -105 dBm)。', 'No notable weak-signal areas (RSRP < -105 dBm) found in this range.'],
+      weak_zone: ['弱訊區', 'Weak zone'],
+      weak_pts: ['弱訊格點', 'weak points'],
+      weak_avg: ['平均 RSRP', 'Avg RSRP'],
+      weak_min: ['最低 RSRP', 'Min RSRP'],
     };
     const QMAP = {
       '優良': 'Excellent', '良好': 'Good', '普通': 'Fair', '較弱': 'Weak', '微弱': 'Very weak',
@@ -453,7 +474,9 @@
     lightTiles.addTo(map);
 
     let layerGroup = L.layerGroup().addTo(map);
+    let weakLayer = L.layerGroup().addTo(map);
     let pointMarkers = [];
+    let weakShown = false;
     let lastSearch = null;
     let lastData = null;
 
@@ -569,6 +592,7 @@
       showAlert('');
       document.getElementById('result').innerHTML = '';
       layerGroup.clearLayers();
+      clearWeak();
       pointMarkers = [];
       lastData = null;
       closeAiFloat();
@@ -669,6 +693,7 @@
     function render(data) {
       lastData = data;
       layerGroup.clearLayers();
+      clearWeak();
       pointMarkers = [];
       const c = [data.center.lat, data.center.lon];
       const op = currentOpacity();
@@ -809,6 +834,114 @@
         aiBtn.disabled = false;
       }
     }
+
+    // ---------------------------------------------------------------------
+    // 框選出弱訊區域（RSRP < -105 dBm，依鄰近度分群後框出）
+    // ---------------------------------------------------------------------
+    const weakBtn = document.getElementById('weak-btn');
+    const WEAK_RSRP = -105;       // 弱訊判定門檻 (dBm)
+    const WEAK_CELL_M = 70;       // 分群網格邊長 (公尺)
+
+    function clearWeak() {
+      weakLayer.clearLayers();
+      weakShown = false;
+      if (weakBtn) { weakBtn.classList.remove('active'); weakBtn.textContent = t('weak_btn'); }
+    }
+
+    // Andrew's monotone chain 凸包 (輸入/輸出皆為 [lon, lat])
+    function convexHull(pts) {
+      if (pts.length < 3) return pts.slice();
+      const arr = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const lower = [];
+      for (const p of arr) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p); }
+      const upper = [];
+      for (let i = arr.length - 1; i >= 0; i--) { const p = arr[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
+      lower.pop(); upper.pop();
+      return lower.concat(upper);
+    }
+
+    // 將弱訊格點以鄰近網格 (8 鄰接) 分群
+    function clusterWeakPoints(weak) {
+      const latRef = weak[0].lat;
+      const dLat = WEAK_CELL_M / 111320;
+      const dLon = WEAK_CELL_M / (111320 * Math.cos(latRef * Math.PI / 180));
+      const cells = new Map();
+      for (const p of weak) {
+        const gx = Math.floor(p.lon / dLon), gy = Math.floor(p.lat / dLat);
+        const key = gx + '_' + gy;
+        if (!cells.has(key)) cells.set(key, { gx, gy, pts: [] });
+        cells.get(key).pts.push(p);
+      }
+      const visited = new Set(), clusters = [];
+      for (const key of cells.keys()) {
+        if (visited.has(key)) continue;
+        const stack = [key]; visited.add(key);
+        const members = [];
+        while (stack.length) {
+          const c = cells.get(stack.pop());
+          members.push(...c.pts);
+          for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const nk = (c.gx + dx) + '_' + (c.gy + dy);
+            if (cells.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push(nk); }
+          }
+        }
+        clusters.push(members);
+      }
+      return { clusters, dLat, dLon };
+    }
+
+    function drawWeakZones(data) {
+      weakLayer.clearLayers();
+      const weak = (data.points || []).filter(p =>
+        p.rsrp !== null && p.rsrp !== undefined && !isNaN(p.rsrp) && p.rsrp < WEAK_RSRP);
+      if (!weak.length) return 0;
+
+      const { clusters, dLat, dLon } = clusterWeakPoints(weak);
+      const padLat = dLat * 0.7, padLon = dLon * 0.7;
+
+      clusters.forEach(members => {
+        const rsrps = members.map(p => p.rsrp);
+        const avg = rsrps.reduce((a, b) => a + b, 0) / rsrps.length;
+        const min = Math.min(...rsrps);
+        const cx = members.reduce((a, p) => a + p.lon, 0) / members.length;
+        const cy = members.reduce((a, p) => a + p.lat, 0) / members.length;
+        const popup = `<b>⚠️ ${t('weak_zone')}</b><br>${t('weak_pts')}: ${members.length}`
+          + `<br>${t('weak_avg')}: ${avg.toFixed(1)} dBm<br>${t('weak_min')}: ${min.toFixed(1)} dBm`;
+
+        let shape;
+        if (members.length >= 3) {
+          const hull = convexHull(members.map(p => [p.lon, p.lat]));
+          // 由形心向外擴張，避免邊緣格點被切到
+          const ll = hull.map(([lon, lat]) => {
+            const vx = lon - cx, vy = lat - cy, len = Math.hypot(vx, vy) || 1e-9;
+            return [lat + (vy / len) * padLat, lon + (vx / len) * padLon];
+          });
+          shape = L.polygon(ll, { color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
+        } else {
+          // 單/雙格點：以圓形框出
+          shape = L.circle([cy, cx], { radius: WEAK_CELL_M * 1.1, color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
+        }
+        shape.bindPopup(popup).addTo(weakLayer);
+        shape.bindTooltip(`⚠️ ${members.length}`, { permanent: true, direction: 'center', className: 'weak-zone-tip', opacity: 1 });
+      });
+      return weak.length;
+    }
+
+    weakBtn.addEventListener('click', () => {
+      if (!lastData || !lastData.points || !lastData.points.length) {
+        showAlert(t('weak_need_query'));
+        return;
+      }
+      if (weakShown) { clearWeak(); return; }
+      const n = drawWeakZones(lastData);
+      if (!n) { showAlert(t('weak_none')); return; }
+      showAlert('');
+      weakShown = true;
+      weakBtn.classList.add('active');
+      weakBtn.textContent = t('weak_btn_clear');
+    });
 
     // ---------------------------------------------------------------------
     // 按鈕事件

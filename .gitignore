@@ -10,6 +10,10 @@ county_bbox*.json
 # 機密設定 (請勿提交)
 .env
 tgos_config.json
+start_local.bat
+start_local.ps1
+server_debug.log
+probe_*.log
 
 # 備份壓縮檔
 *.zip
