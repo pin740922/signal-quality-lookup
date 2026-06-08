@@ -22,3 +22,7 @@ services:
       # 金鑰為機密，不寫進版控；請在 Render 後台 Environment 填入其值
       - key: AI_API_KEY
         sync: false
+      # ---- Google Geocoding（後端伺服器端地址/地標定位，門牌等級最準）----
+      # 金鑰為機密，不寫進版控；請在 Render 後台 Environment 填入其值
+      - key: GOOGLE_GEOCODING_KEY
+        sync: false

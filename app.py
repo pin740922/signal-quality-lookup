@@ -87,6 +87,13 @@ USER_AGENT = "TWM-Signal-Lookup/1.0 (telecom store support tool)"
 # 請以環境變數 GOOGLE_MAPS_KEY 設定；未設定時前端改用 TGOS / Nominatim 定位。
 GOOGLE_MAPS_KEY = os.environ.get("GOOGLE_MAPS_KEY", "")
 
+# Google Geocoding API 金鑰 (選用，供「後端」伺服器端地址 / 地標定位使用)。
+# 與 GOOGLE_MAPS_KEY 不同：此金鑰需在 Google Cloud 啟用「Geocoding API」，
+# 且「應用程式限制」需設為「無」或「IP 位址」(切勿用 HTTP 參照網址限制，否則伺服器端會被擋)。
+# 設定後，地址 / 地標定位會優先使用 Google (門牌等級最準)，失敗再退回 TGOS / Nominatim。
+GOOGLE_GEOCODING_KEY = os.environ.get("GOOGLE_GEOCODING_KEY", "")
+GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+
 # TGOS 全國門牌地址定位服務 (內政部)。
 # 方式一(預設、免申請)：透過 TGOS 公開圖臺 (map.tgos.tw) 的查詢控制器取得門牌座標，
 #   不需個人 AppID/APIKey；以瀏覽器相同的方式取得 session 與 CSRF/Request 權杖後查詢。
@@ -569,6 +576,47 @@ def geocode_tgos(address):
     return None
 
 
+def geocode_google(query):
+    """透過 Google Geocoding API 將地址 / 地標轉成經緯度。
+
+    回傳 (lat, lon, display_name) 或 None (查無結果)。
+    需設定環境變數 GOOGLE_GEOCODING_KEY；未設定時直接回傳 None (不影響後續退回機制)。
+    """
+    if not GOOGLE_GEOCODING_KEY:
+        return None
+    params = {
+        "address": query,
+        "key": GOOGLE_GEOCODING_KEY,
+        "language": "zh-TW",
+        "region": "tw",
+        # 限縮在台灣範圍，避免命中海外同名地點
+        "components": "country:TW",
+    }
+    last = None
+    for attempt in range(2):  # 對偶發連線錯誤自動重試一次
+        try:
+            resp = requests.get(GOOGLE_GEOCODING_URL, params=params, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            status = data.get("status")
+            if status == "OK" and data.get("results"):
+                r = data["results"][0]
+                loc = r["geometry"]["location"]
+                return float(loc["lat"]), float(loc["lng"]), r.get("formatted_address", query)
+            if status == "ZERO_RESULTS":
+                return None
+            # REQUEST_DENIED / OVER_QUERY_LIMIT / INVALID_REQUEST 等：記錄後回傳 None 以退回其他來源
+            print(f"[Google] 定位非 OK：status={status} msg={data.get('error_message', '')}", flush=True)
+            return None
+        except (requests.exceptions.RequestException, OSError) as e:
+            last = e
+            if attempt == 0:
+                time.sleep(0.8)
+    if last is not None:
+        print(f"[Google] 連線失敗：{last}", flush=True)
+    return None
+
+
 def geocode(query):
     """透過 Nominatim 將地址 / 地標轉成經緯度。回傳 (lat, lon, display_name) 或 None。"""
     params = {
@@ -756,10 +804,22 @@ def api_search():
             return jsonify({"ok": False, "error": "請輸入地標關鍵字。"}), 400
         candidates = [query]
 
-    # 轉經緯度：地址模式優先使用 TGOS (政府門牌)，失敗再退回 OpenStreetMap
+    # 轉經緯度：優先使用 Google (門牌等級最準)；其次地址模式走 TGOS (政府門牌)；最後退回 OpenStreetMap
     source = "OpenStreetMap"
     geo = None
-    if mode == "address":
+
+    # 0) Google Geocoding (若已設定 GOOGLE_GEOCODING_KEY)，地址 / 地標皆適用
+    if GOOGLE_GEOCODING_KEY:
+        try:
+            gg = geocode_google(query)
+        except Exception as e:  # noqa: BLE001
+            print(f"[Google] 定位發生例外：{e}", flush=True)
+            gg = None
+        if gg:
+            geo = (gg[0], gg[1], gg[2], query)
+            source = "Google"
+
+    if geo is None and mode == "address":
         tg = None
         # 1) TGOS 公開圖臺 (免申請)
         try:
