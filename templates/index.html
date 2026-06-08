@@ -258,6 +258,147 @@
       border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 10px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       英文模式：深色「科技黑 + 金屬銅」主題（地圖另採 CARTO 淺色）
+       ============================================================ */
+    body.theme-dark {
+      --bg: #08090b;
+      --panel: #121417;
+      --panel-2: #1a1d22;
+      --border: #2c3036;
+      --border-bright: rgba(214, 142, 79, .65);
+      --text: #eef0f2;
+      --muted: #9aa0a8;
+      --brand: #d68e4f;          /* 金屬銅 */
+      --brand2: #f0b277;         /* 銅色高光 */
+      --brand-dark: #0e1013;
+      --grad: linear-gradient(135deg, #14171b, #b06a2e 65%, #e0a05a);
+    }
+    body.theme-dark { background: var(--bg); }
+    /* 標頭：科技黑 → 金屬銅（帶高光漸層） */
+    body.theme-dark header { box-shadow: 0 2px 16px rgba(0, 0, 0, .6); }
+    /* 標頭所有文字改純白 */
+    body.theme-dark header,
+    body.theme-dark header * { color: #ffffff; }
+    body.theme-dark .head-titles p { opacity: .92; }
+
+    body.theme-dark .sidebar::-webkit-scrollbar-thumb,
+    body.theme-dark .ai-float-body::-webkit-scrollbar-thumb { background: #3a4048; }
+
+    /* 分頁 / 表單 / 輸入 */
+    body.theme-dark .tab.active { background: #1c2026; }
+    body.theme-dark input,
+    body.theme-dark select { background: #181b20; color: var(--text); border-color: var(--border); }
+    body.theme-dark input::placeholder { color: #7e848c; }
+    body.theme-dark input:focus,
+    body.theme-dark select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(214, 142, 79, .2); }
+    body.theme-dark button.search:disabled { background: #3a4048; color: #9aa0a8; }
+
+    /* Edit 圖示鈕 */
+    body.theme-dark .edit-icon-btn { background: #181b20; color: var(--text); border-color: var(--border); }
+    body.theme-dark .edit-icon-btn:hover:not(:disabled) { border-color: var(--brand); background: #23272d; }
+    body.theme-dark .edit-icon-btn.active { background: var(--brand); border-color: var(--brand); color: #14100a; box-shadow: 0 0 0 3px rgba(214, 142, 79, .24); }
+
+    /* 結果區 */
+    body.theme-dark .stat .v { color: var(--brand2); }
+    body.theme-dark .addr-line .mono { color: var(--brand); }
+    body.theme-dark .alert.error { background: #2a1614; color: #f1b4ac; border-color: #5a2c24; }
+
+    /* 地圖功能列 / 按鈕 / 圖例 */
+    body.theme-dark .map-funcbar { background: #121417; border-bottom-color: var(--border); box-shadow: 0 1px 10px rgba(0, 0, 0, .55); }
+    body.theme-dark .fb-btn { background: #181b20; color: var(--text); border-color: var(--border); }
+    body.theme-dark .fb-btn:hover { background: #23272d; border-color: var(--border-bright); }
+    body.theme-dark #net { background: #23272d; border-color: var(--brand); color: var(--brand); }
+    body.theme-dark .legend { background: #121417; border-color: var(--border); box-shadow: 0 2px 16px rgba(0, 0, 0, .6); }
+    body.theme-dark .legend .legend-title { color: var(--text); }
+
+    /* 地圖控制鈕（衛星切換） */
+    body.theme-dark .map-sat-ctrl a { background: #181b20; color: #eef0f2; }
+    body.theme-dark .map-sat-ctrl a.active { background: var(--brand); color: #14100a; }
+
+    /* 可拖曳圓控制點：改金屬銅 */
+    body.theme-dark .center-handle .ch-dot { background: var(--brand); box-shadow: 0 0 0 1px var(--brand), 0 1px 4px rgba(0,0,0,.65); }
+    body.theme-dark .radius-handle .rh-dot { border-color: var(--brand); }
+
+    /* 確定浮動列 */
+    body.theme-dark .edit-confirm { background: #181b20; border-color: var(--border); box-shadow: 0 8px 30px rgba(0, 0, 0, .65); }
+    body.theme-dark .edit-btn.cancel { background: #23272d; color: var(--text); border-color: var(--border); }
+    body.theme-dark .edit-btn.cancel:hover { background: #2d323a; }
+
+    /* 載入遮罩 */
+    body.theme-dark .spinner { background: rgba(8, 9, 11, .64); color: var(--brand); }
+    body.theme-dark .loader { border-color: #3a4048; border-top-color: var(--brand); }
+
+    /* AI 懸浮視窗：深色卡片（保留 AI 紫色標頭辨識度） */
+    body.theme-dark .ai-float { background: var(--panel); border-color: #3a3550; box-shadow: 0 16px 42px rgba(0, 0, 0, .72); }
+    body.theme-dark .ai-headline { color: #d9b8f5; }
+    body.theme-dark .ai-detail { color: var(--text); }
+    body.theme-dark ul.ai-advice li { color: var(--muted); }
+
+    /* ----- 科技金屬立體感：按鈕與框（英文深色模式） ----- */
+    /* 主要查詢鈕：金屬銅、凸起、按下回彈 */
+    body.theme-dark button.search {
+      background: linear-gradient(180deg, #e7a866 0%, #d68e4f 45%, #b06a2e 100%);
+      border: 1px solid #8a531f; color: #2a1605; text-shadow: 0 1px 0 rgba(255, 255, 255, .25);
+      box-shadow: 0 3px 0 #6e3f17, 0 8px 16px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .45);
+    }
+    body.theme-dark button.search:hover { filter: brightness(1.06); box-shadow: 0 3px 0 #6e3f17, 0 10px 20px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .5); transform: translateY(-1px); }
+    body.theme-dark button.search:active { transform: translateY(2px); box-shadow: 0 1px 0 #6e3f17, 0 3px 8px rgba(0, 0, 0, .5), inset 0 2px 5px rgba(0, 0, 0, .3); }
+
+    /* 次要金屬鈕：深鋼面、凸起 */
+    body.theme-dark .fb-btn,
+    body.theme-dark .edit-icon-btn,
+    body.theme-dark #net,
+    body.theme-dark .map-sat-ctrl a,
+    body.theme-dark .edit-btn.cancel {
+      background: linear-gradient(180deg, #262b32 0%, #181b20 100%);
+      border: 1px solid #383e46;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, .55), 0 5px 12px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .07);
+    }
+    body.theme-dark .fb-btn:hover,
+    body.theme-dark .edit-icon-btn:hover:not(:disabled),
+    body.theme-dark .edit-btn.cancel:hover { background: linear-gradient(180deg, #2f353d 0%, #1f242a 100%); border-color: var(--border-bright); transform: translateY(-1px); }
+    body.theme-dark .fb-btn:active,
+    body.theme-dark .edit-icon-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 rgba(0,0,0,.5), inset 0 2px 5px rgba(0, 0, 0, .45); }
+    /* 啟用中的銅色鈕：凸起金屬銅 */
+    body.theme-dark .edit-icon-btn.active,
+    body.theme-dark .map-sat-ctrl a.active,
+    body.theme-dark .fb-btn.done {
+      background: linear-gradient(180deg, #e7a866, #c47e3e);
+      border-color: #8a531f; color: #2a1605;
+      box-shadow: 0 2px 0 #6e3f17, 0 5px 12px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .4);
+    }
+    body.theme-dark .edit-btn.ok {
+      background: linear-gradient(180deg, #22c55e, #16a34a); border: 1px solid #0f7a37;
+      box-shadow: 0 2px 0 #0c6b30, 0 5px 12px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .35);
+    }
+    body.theme-dark .edit-btn.ok:active { transform: translateY(2px); box-shadow: 0 0 0 #0c6b30, inset 0 2px 5px rgba(0, 0, 0, .35); }
+
+    /* 凹陷感輸入框（內陰影） */
+    body.theme-dark input,
+    body.theme-dark select {
+      background: #14171b;
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, .55), inset 0 -1px 0 rgba(255, 255, 255, .04);
+    }
+
+    /* 凸起立體框：統計卡 / 圖例 / 功能列 / 浮動列 / AI 視窗 */
+    body.theme-dark .stat {
+      background: linear-gradient(180deg, #1b1f25 0%, #14171b 100%);
+      border: 1px solid #2c3137;
+      box-shadow: 0 5px 14px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+    }
+    body.theme-dark .stat:hover { border-color: var(--border-bright); box-shadow: 0 7px 18px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .08); }
+    body.theme-dark .legend,
+    body.theme-dark .map-funcbar,
+    body.theme-dark .edit-confirm,
+    body.theme-dark .ai-float {
+      background: linear-gradient(180deg, #181c21 0%, #121417 100%);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
+    }
+    /* 頂部一道銅色高光，強化金屬框邊 */
+    body.theme-dark .map-funcbar { border-top: 1px solid rgba(214, 142, 79, .25); }
+    body.theme-dark .verdict-card { box-shadow: 0 8px 22px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .12); }
   </style>
 </head>
 <body>
@@ -522,16 +663,17 @@
       maxBounds: TW_BOUNDS, maxBoundsViscosity: 1.0
     }).setView(INIT_CENTER, INIT_ZOOM);
 
+    // 中文：OpenStreetMap 亮色；英文：CARTO Positron 淺色（介面另轉深色玫瑰金）
     const lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap'
     });
-    const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO'
     });
     const satTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19, attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'
     });
-    let mapDark = false;
+    let mapEn = false;    // 介面是否為英文（深色玫瑰金 + CARTO 淺色地圖）
     let mapSat = false;
     lightTiles.addTo(map);
 
@@ -549,10 +691,11 @@
     map.addControl(new SatControl());
 
     function applyBaseLayer() {
-      [lightTiles, darkTiles, satTiles].forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
-      const base = mapSat ? satTiles : (mapDark ? darkTiles : lightTiles);
+      [lightTiles, cartoLight, satTiles].forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+      const base = mapSat ? satTiles : (mapEn ? cartoLight : lightTiles);
       base.addTo(map); base.bringToBack();
-      document.body.classList.toggle('dark-map', mapDark || mapSat);
+      // 浮水印：僅衛星（深色影像）用淡白；OSM/CARTO 皆亮底，用淡紫
+      document.body.classList.toggle('dark-map', mapSat);
       const btn = document.getElementById('sat-btn');
       if (btn) { btn.innerHTML = mapSat ? '🗺️' : '🛰️'; btn.classList.toggle('active', mapSat); }
     }
@@ -582,10 +725,13 @@
       document.getElementById('alert-box').innerHTML = msg ? `<div class="alert error">${msg}</div>` : '';
     }
 
-    // 地圖深淺色跟著語言走：中文=亮色、English=深色（衛星模式時保留衛星底圖）
-    function setMapTheme(dark) {
-      if (dark === mapDark) return;
-      mapDark = dark;
+    // 介面/地圖跟著語言走：
+    //   中文 = 亮色介面 + OpenStreetMap
+    //   英文 = 深色金屬銅介面 + 衛星底圖（預設；可再用右上角切換鈕換成 CARTO 淺色）
+    function setMapTheme(en) {
+      mapEn = en;
+      mapSat = en;   // 英文預設採用衛星底圖
+      document.body.classList.toggle('theme-dark', en);
       applyBaseLayer();
     }
 
