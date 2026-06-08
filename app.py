@@ -14,9 +14,17 @@ import json
 import math
 import os
 import re
+import sys
 import threading
 import time
 import zipfile
+
+# Windows 主控台預設為 cp1252，print 中文會丟 UnicodeEncodeError；統一改為 UTF-8。
+for _stream in ("stdout", "stderr"):
+    try:
+        getattr(sys, _stream).reconfigure(encoding="utf-8")
+    except Exception:  # noqa: BLE001 - 部分執行環境的串流不支援 reconfigure
+        pass
 
 import numpy as np
 import pandas as pd
@@ -572,13 +580,21 @@ def geocode(query):
         "addressdetails": 1,
     }
     headers = {"User-Agent": USER_AGENT}
-    resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=15)
-    resp.raise_for_status()
-    results = resp.json()
-    if not results:
-        return None
-    r = results[0]
-    return float(r["lat"]), float(r["lon"]), r.get("display_name", query)
+    last = None
+    for attempt in range(2):  # 對雲端 IP 偶發連線錯誤 (如 [Errno 22]) 自動重試一次
+        try:
+            resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=15)
+            resp.raise_for_status()
+            results = resp.json()
+            if not results:
+                return None
+            r = results[0]
+            return float(r["lat"]), float(r["lon"]), r.get("display_name", query)
+        except (requests.exceptions.RequestException, OSError) as e:
+            last = e
+            if attempt == 0:
+                time.sleep(1.0)
+    raise last
 
 
 def geocode_with_fallback(candidates):
@@ -766,7 +782,8 @@ def api_search():
         try:
             geo = geocode_with_fallback(candidates)
         except Exception as e:  # noqa: BLE001
-            return jsonify({"ok": False, "error": f"地址定位服務發生錯誤：{e}"}), 502
+            print(f"[geocode] 全部候選定位失敗：{e}", flush=True)
+            return jsonify({"ok": False, "error": "定位服務暫時無回應，請稍後再試一次，或改用「地標查詢」或直接輸入座標。"}), 502
         if geo is None:
             return jsonify({"ok": False, "error": f"找不到「{query}」的位置，請確認輸入是否正確。"}), 404
 
