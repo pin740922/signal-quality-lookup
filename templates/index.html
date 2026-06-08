@@ -304,7 +304,7 @@
         </div>
         <div class="fb-sep"></div>
         <button class="fb-btn ai-fb-btn" id="ai-btn" data-i18n="ai_btn">🤖 AI 智能分析</button>
-        <button class="fb-btn weak-fb-btn" id="weak-btn" data-i18n="weak_btn">⚠️ 框選出弱訊區域</button>
+        <button class="fb-btn weak-fb-btn" id="weak-btn" data-i18n="weak_btn">⚠️ 框選PA區域</button>
       </div>
       <div id="map"></div>
       <div class="ai-float" id="ai-float" hidden>
@@ -396,12 +396,12 @@
       ai_tag_rule: ['規則式', 'Rule-based'],
       ai_err: ['AI 判讀失敗，請稍後再試。', 'AI diagnosis failed, please try again.'],
       ai_need_query: ['請先查詢一個位置，再進行 AI 分析。', 'Please run a location query first, then use AI analysis.'],
-      weak_btn: ['⚠️ 框選出弱訊區域', '⚠️ Outline weak areas'],
-      weak_btn_clear: ['✖ 清除弱訊框選', '✖ Clear weak areas'],
-      weak_need_query: ['請先查詢一個位置，再框選弱訊區域。', 'Please run a location query first, then outline weak areas.'],
-      weak_none: ['此範圍內未發現明顯弱訊區域 (RSRP < -105 dBm)。', 'No notable weak-signal areas (RSRP < -105 dBm) found in this range.'],
-      weak_zone: ['弱訊區', 'Weak zone'],
-      weak_pts: ['弱訊格點', 'weak points'],
+      weak_btn: ['⚠️ 框選PA區域', '⚠️ Outline PA areas'],
+      weak_btn_clear: ['✖ 清除PA框選', '✖ Clear PA areas'],
+      weak_need_query: ['請先查詢一個位置，再框選 PA 區域。', 'Please run a location query first, then outline PA areas.'],
+      weak_none: ['此範圍內未發現符合條件的 PA 區域。', 'No PA areas matching the criteria found in this range.'],
+      weak_zone: ['PA 區', 'PA zone'],
+      weak_pts: ['PA 格點', 'PA points'],
       weak_avg: ['平均 RSRP', 'Avg RSRP'],
       weak_min: ['最低 RSRP', 'Min RSRP'],
     };
@@ -836,16 +836,132 @@
     }
 
     // ---------------------------------------------------------------------
-    // 框選出弱訊區域（RSRP < -105 dBm，依鄰近度分群後框出）
+    // 框選 PA 區域（以 DBSCAN 分群後框出）
+    //   4G：點 = iPhone1Bar；DBSCAN(eps=100m, minPts=12)
+    //   5G：點 = PoorRSRPPercentage >= 20；DBSCAN(eps=100m, minPts=3)
     // ---------------------------------------------------------------------
     const weakBtn = document.getElementById('weak-btn');
-    const WEAK_RSRP = -105;       // 弱訊判定門檻 (dBm)
-    const WEAK_CELL_M = 70;       // 分群網格邊長 (公尺)
+    const PA_EPS_M = 100;                       // DBSCAN 鄰域半徑 (公尺)
+    const PA_MINPTS = { '4G': 12, '5G': 3 };    // DBSCAN 最小點數
+    const PA_POOR_PCT_MIN = 20;                 // 5G：PoorRSRPPercentage 門檻 (%)
 
     function clearWeak() {
       weakLayer.clearLayers();
       weakShown = false;
       if (weakBtn) { weakBtn.classList.remove('active'); weakBtn.textContent = t('weak_btn'); }
+    }
+
+    function haversineM(lat1, lon1, lat2, lon2) {
+      const R = 6371000, toRad = Math.PI / 180;
+      const dlat = (lat2 - lat1) * toRad, dlon = (lon2 - lon1) * toRad;
+      const a = Math.sin(dlat / 2) ** 2 + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dlon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    // iPhone 1 Bar 判定 (4G)：
+    //   (a) RSRQ <= -15  且 RSRP <= -85
+    //   (b) -15 < RSRQ <= -14 且 RSRP <= -100
+    function isIphone1Bar(p) {
+      const rsrp = p.rsrp, rsrq = p.rsrq;
+      if (rsrp === null || rsrp === undefined || isNaN(rsrp)) return false;
+      if (rsrq === null || rsrq === undefined || isNaN(rsrq)) return false;
+      if (rsrq <= -15 && rsrp <= -85) return true;
+      if (rsrq > -15 && rsrq <= -14 && rsrp <= -100) return true;
+      return false;
+    }
+
+    // 依網路別挑出組成 PA 區域的候選點
+    function paCandidates(points, net) {
+      if (net === '5G') {
+        return points.filter(p => p.poor_pct !== null && p.poor_pct !== undefined
+          && !isNaN(p.poor_pct) && p.poor_pct >= PA_POOR_PCT_MIN);
+      }
+      return points.filter(isIphone1Bar);
+    }
+
+    // DBSCAN：回傳每個點的群編號 (>=1)，未分群者為 0
+    function dbscan(pts, epsM, minPts) {
+      const n = pts.length;
+      const labels = new Array(n).fill(0);   // 0=未訪問, -1=雜訊, >=1=群編號
+      const neighbors = (i) => {
+        const res = [];
+        for (let j = 0; j < n; j++) {
+          if (haversineM(pts[i].lat, pts[i].lon, pts[j].lat, pts[j].lon) <= epsM) res.push(j);
+        }
+        return res;
+      };
+      let cid = 0;
+      for (let i = 0; i < n; i++) {
+        if (labels[i] !== 0) continue;
+        const nb = neighbors(i);          // 含自身
+        if (nb.length < minPts) { labels[i] = -1; continue; }
+        cid++;
+        labels[i] = cid;
+        const queue = nb.filter(j => j !== i);
+        for (let qi = 0; qi < queue.length; qi++) {
+          const j = queue[qi];
+          if (labels[j] === -1) labels[j] = cid;   // 邊界點
+          if (labels[j] !== 0) continue;
+          labels[j] = cid;
+          const nb2 = neighbors(j);
+          if (nb2.length >= minPts) for (const k of nb2) queue.push(k);
+        }
+      }
+      return labels.map(l => (l > 0 ? l : 0));
+    }
+
+    function drawWeakZones(data) {
+      weakLayer.clearLayers();
+      const net = data.net || currentNet();
+      const minPts = PA_MINPTS[net] || PA_MINPTS['4G'];
+      const cand = paCandidates(data.points || [], net);
+      if (cand.length < minPts) return 0;
+
+      const labels = dbscan(cand, PA_EPS_M, minPts);
+      const groups = new Map();
+      labels.forEach((lab, i) => {
+        if (lab <= 0) return;
+        if (!groups.has(lab)) groups.set(lab, []);
+        groups.get(lab).push(cand[i]);
+      });
+      if (!groups.size) return 0;
+
+      const pad = 30;   // 框線向外擴張 (公尺)，避免切到邊緣點
+      let total = 0;
+
+      groups.forEach(members => {
+        total += members.length;
+        const rsrps = members.map(p => p.rsrp).filter(v => v !== null && v !== undefined && !isNaN(v));
+        const avg = rsrps.length ? rsrps.reduce((a, b) => a + b, 0) / rsrps.length : null;
+        const min = rsrps.length ? Math.min(...rsrps) : null;
+        const cx = members.reduce((a, p) => a + p.lon, 0) / members.length;
+        const cy = members.reduce((a, p) => a + p.lat, 0) / members.length;
+        const padLat = pad / 111320, padLon = pad / (111320 * Math.cos(cy * Math.PI / 180));
+
+        let extra = '';
+        if (net === '5G') {
+          const pp = members.map(p => p.poor_pct).filter(v => v !== null && v !== undefined && !isNaN(v));
+          if (pp.length) extra = `<br>PoorRSRP%: ${(pp.reduce((a, b) => a + b, 0) / pp.length).toFixed(1)}%`;
+        }
+        const popup = `<b>⚠️ ${t('weak_zone')} (${net})</b><br>${t('weak_pts')}: ${members.length}`
+          + (avg !== null ? `<br>${t('weak_avg')}: ${avg.toFixed(1)} dBm<br>${t('weak_min')}: ${min.toFixed(1)} dBm` : '')
+          + extra;
+
+        let shape;
+        if (members.length >= 3) {
+          const hull = convexHull(members.map(p => [p.lon, p.lat]));
+          const ll = hull.map(([lon, lat]) => {
+            const vx = lon - cx, vy = lat - cy, len = Math.hypot(vx, vy) || 1e-9;
+            return [lat + (vy / len) * padLat, lon + (vx / len) * padLon];
+          });
+          shape = L.polygon(ll, { color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
+        } else {
+          shape = L.circle([cy, cx], { radius: PA_EPS_M * 0.6, color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
+        }
+        shape.bindPopup(popup).addTo(weakLayer);
+        shape.bindTooltip(`⚠️ ${members.length}`, { permanent: true, direction: 'center', className: 'weak-zone-tip', opacity: 1 });
+      });
+      return total;
     }
 
     // Andrew's monotone chain 凸包 (輸入/輸出皆為 [lon, lat])
@@ -859,74 +975,6 @@
       for (let i = arr.length - 1; i >= 0; i--) { const p = arr[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
       lower.pop(); upper.pop();
       return lower.concat(upper);
-    }
-
-    // 將弱訊格點以鄰近網格 (8 鄰接) 分群
-    function clusterWeakPoints(weak) {
-      const latRef = weak[0].lat;
-      const dLat = WEAK_CELL_M / 111320;
-      const dLon = WEAK_CELL_M / (111320 * Math.cos(latRef * Math.PI / 180));
-      const cells = new Map();
-      for (const p of weak) {
-        const gx = Math.floor(p.lon / dLon), gy = Math.floor(p.lat / dLat);
-        const key = gx + '_' + gy;
-        if (!cells.has(key)) cells.set(key, { gx, gy, pts: [] });
-        cells.get(key).pts.push(p);
-      }
-      const visited = new Set(), clusters = [];
-      for (const key of cells.keys()) {
-        if (visited.has(key)) continue;
-        const stack = [key]; visited.add(key);
-        const members = [];
-        while (stack.length) {
-          const c = cells.get(stack.pop());
-          members.push(...c.pts);
-          for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
-            if (dx === 0 && dy === 0) continue;
-            const nk = (c.gx + dx) + '_' + (c.gy + dy);
-            if (cells.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push(nk); }
-          }
-        }
-        clusters.push(members);
-      }
-      return { clusters, dLat, dLon };
-    }
-
-    function drawWeakZones(data) {
-      weakLayer.clearLayers();
-      const weak = (data.points || []).filter(p =>
-        p.rsrp !== null && p.rsrp !== undefined && !isNaN(p.rsrp) && p.rsrp < WEAK_RSRP);
-      if (!weak.length) return 0;
-
-      const { clusters, dLat, dLon } = clusterWeakPoints(weak);
-      const padLat = dLat * 0.7, padLon = dLon * 0.7;
-
-      clusters.forEach(members => {
-        const rsrps = members.map(p => p.rsrp);
-        const avg = rsrps.reduce((a, b) => a + b, 0) / rsrps.length;
-        const min = Math.min(...rsrps);
-        const cx = members.reduce((a, p) => a + p.lon, 0) / members.length;
-        const cy = members.reduce((a, p) => a + p.lat, 0) / members.length;
-        const popup = `<b>⚠️ ${t('weak_zone')}</b><br>${t('weak_pts')}: ${members.length}`
-          + `<br>${t('weak_avg')}: ${avg.toFixed(1)} dBm<br>${t('weak_min')}: ${min.toFixed(1)} dBm`;
-
-        let shape;
-        if (members.length >= 3) {
-          const hull = convexHull(members.map(p => [p.lon, p.lat]));
-          // 由形心向外擴張，避免邊緣格點被切到
-          const ll = hull.map(([lon, lat]) => {
-            const vx = lon - cx, vy = lat - cy, len = Math.hypot(vx, vy) || 1e-9;
-            return [lat + (vy / len) * padLat, lon + (vx / len) * padLon];
-          });
-          shape = L.polygon(ll, { color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
-        } else {
-          // 單/雙格點：以圓形框出
-          shape = L.circle([cy, cx], { radius: WEAK_CELL_M * 1.1, color: '#dc2626', weight: 2, dashArray: '6 4', fillColor: '#ef4444', fillOpacity: 0.18 });
-        }
-        shape.bindPopup(popup).addTo(weakLayer);
-        shape.bindTooltip(`⚠️ ${members.length}`, { permanent: true, direction: 'center', className: 'weak-zone-tip', opacity: 1 });
-      });
-      return weak.length;
     }
 
     weakBtn.addEventListener('click', () => {

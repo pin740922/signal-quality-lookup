@@ -59,6 +59,7 @@ NETWORKS = {
             "lon": "LONGITUDE", "lat": "LATITUDE",
             "rsrp": "AVGRSRP", "rsrq": "AVGRSRQ", "sinr": "AVGPUSCHSINR",
             "dl": "MACTPUTKBPS_DL", "mr": "MR_COUNT", "cqi": "AVGCQI",
+            "poorcount": "POORRSRPCOUNT", "poorpct": "POORRSRPPERCENTAGE",
         },
         "dl_divisor": 1000.0,  # kbps -> Mbps
     },
@@ -69,6 +70,7 @@ NETWORKS = {
             "lon": "LONGITUDE", "lat": "LATITUDE",
             "rsrp": "AVGNRCELLRSRP", "rsrq": "AVGNRCELLRSRQ", "sinr": "AVGNRCELLSINR",
             "dl": "DLAVGTPUT", "mr": "SUMNRMRCOUNT", "cqi": None,
+            "poorcount": "POORRSRPCOUNT", "poorpct": None,
         },
         "dl_divisor": 1.0,  # 已是 Mbps
     },
@@ -239,6 +241,7 @@ def load_county(zh, net=DEFAULT_NET):
         "lon": col("lon", "float64"), "lat": col("lat", "float64"),
         "rsrp": col("rsrp"), "rsrq": col("rsrq"), "sinr": col("sinr"),
         "dl": col("dl"), "mr": col("mr"), "cqi": col("cqi"),
+        "poorcount": col("poorcount"), "poorpct": col("poorpct"),
     }
     del df  # 釋放 pandas DataFrame，降低載入時的暫時記憶體尖峰
     with _cache_lock:
@@ -307,6 +310,16 @@ def query_signals(lat, lon, radius_m=DEFAULT_RADIUS_M, net=DEFAULT_NET):
             rsrp = float(data["rsrp"][i])
             label, color = rsrp_quality(rsrp)
             dl = data["dl"][i]
+            # PoorRSRPPercentage：binning 點內 RSRP < Poor RSRP(-110 dBm) 的 MR 數佔總 MR 數比例 (%)
+            # 4G 已有 POORRSRPPERCENTAGE 欄位可直接使用；5G 無此欄位，改以 POORRSRPCOUNT / MR 計算。
+            poorpct_val = data["poorpct"][i]
+            if _isnan(poorpct_val):
+                pc = data["poorcount"][i]
+                mr = data["mr"][i]
+                if not _isnan(pc) and not _isnan(mr) and float(mr) > 0:
+                    poorpct_val = float(pc) / float(mr) * 100.0
+                else:
+                    poorpct_val = float("nan")
             points.append({
                 "lon": round(float(data["lon"][i]), 6),
                 "lat": round(float(data["lat"][i]), 6),
@@ -316,6 +329,7 @@ def query_signals(lat, lon, radius_m=DEFAULT_RADIUS_M, net=DEFAULT_NET):
                 "dl_mbps": _num(dl / dl_div if not _isnan(dl) else dl, 1),
                 "mr": _int(data["mr"][i]),
                 "cqi": _num(data["cqi"][i], 1),
+                "poor_pct": _num(poorpct_val, 1),
                 "distance": round(float(di), 0),
                 "quality": label,
                 "color": color,
